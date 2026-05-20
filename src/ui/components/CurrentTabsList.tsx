@@ -39,16 +39,26 @@ export function CurrentTabsList({
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
   if (tabs.length === 0) return <div style={styles.state}>当前没有可收纳网页</div>
 
+  // Count how many current tabs share each normalizedUrl
+  const openCountByNormalizedUrl = new Map<string, number>()
+  for (const tab of tabs) {
+    const n = normalizeUrl(tab.url)
+    openCountByNormalizedUrl.set(n, (openCountByNormalizedUrl.get(n) ?? 0) + 1)
+  }
+
   return (
     <div>
       {tabs.map((tab) => {
         const key = getTabKey(tab)
-        const capturedTab = capturedTabsByNormalizedUrl.get(normalizeUrl(tab.url))
+        const n = normalizeUrl(tab.url)
+        const capturedTab = capturedTabsByNormalizedUrl.get(n)
+        const duplicateOpenCount = openCountByNormalizedUrl.get(n) ?? 1
         return (
           <CurrentTabCard
             key={key}
             tab={tab}
             capturedTab={capturedTab}
+            duplicateOpenCount={duplicateOpenCount}
             noteExpanded={expandedNoteKey === key}
             onToggleNote={() =>
               setExpandedNoteKey((prev) => (prev === key ? null : key))

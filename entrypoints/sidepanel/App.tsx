@@ -15,10 +15,8 @@ import { InboxList } from '../../src/ui/components/InboxList'
 import { TrashList } from '../../src/ui/components/TrashList'
 import { SessionList } from '../../src/ui/components/SessionList'
 import { normalizeStore } from '../../src/services/storeNormalizeService'
-import {
-  isEffectiveCapturedTab,
-  isUngroupedInboxTab,
-} from '../../src/services/savedTabVisibilityService'
+import { isUngroupedInboxTab } from '../../src/services/savedTabVisibilityService'
+import { selectCapturedTabsByNormalizedUrl } from '../../src/services/savedTabSelectService'
 
 export function App() {
   const [currentTabs, setCurrentTabs] = useState<BrowserTab[]>([])
@@ -177,11 +175,7 @@ export function App() {
   const ungroupedTabs = savedTabs.filter((t) => isUngroupedInboxTab(t, sessionsById))
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
 
-  const capturedTabsByNormalizedUrl = new Map<string, SavedTab>(
-    savedTabs
-      .filter((t) => isEffectiveCapturedTab(t, sessionsById))
-      .map((t) => [t.normalizedUrl, t])
-  )
+  const capturedTabsByNormalizedUrl = selectCapturedTabsByNormalizedUrl(savedTabs, sessionsById)
 
   const tabsById = Object.fromEntries(savedTabs.map((t) => [t.id, t]))
 

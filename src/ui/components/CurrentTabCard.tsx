@@ -6,6 +6,7 @@ import { getDomainFromUrl } from '../../services/urlFilterService'
 type Props = {
   tab: BrowserTab
   capturedTab?: SavedTab
+  duplicateOpenCount?: number
   noteExpanded: boolean
   onToggleNote: () => void
   onCollapseNote: () => void
@@ -20,6 +21,7 @@ type Props = {
 export function CurrentTabCard({
   tab,
   capturedTab,
+  duplicateOpenCount = 1,
   noteExpanded,
   onToggleNote,
   onCollapseNote,
@@ -192,6 +194,9 @@ export function CurrentTabCard({
       >
         {domain}
       </div>
+      {duplicateOpenCount > 1 && (
+        <div style={styles.duplicateHint}>同一页面已打开 {duplicateOpenCount} 个</div>
+      )}
       {activateError && <div style={styles.activateError}>{activateError}</div>}
 
       {noteExpanded && (
@@ -347,6 +352,10 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     cursor: 'pointer',
+  },
+  duplicateHint: {
+    fontSize: 11,
+    color: '#d97706',
   },
   activateError: {
     fontSize: 11,

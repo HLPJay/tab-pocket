@@ -86,4 +86,23 @@ describe('normalizeUrl', () => {
     const b = normalizeUrl('https://example.com/page2')
     expect(a).not.toBe(b)
   })
+
+  it('different Gemini conversation paths are not collapsed', () => {
+    const a = normalizeUrl('https://gemini.google.com/app/abc123')
+    const b = normalizeUrl('https://gemini.google.com/app/xyz789')
+    expect(a).not.toBe(b)
+  })
+
+  it('preserves meaningful query params alongside stripping tracking params', () => {
+    const result = normalizeUrl('https://example.com/search?q=test&utm_source=email')
+    expect(result).toContain('q=test')
+    expect(result).not.toContain('utm_source')
+  })
+
+  it('preserves both hash and non-tracking query params together', () => {
+    const result = normalizeUrl('https://example.com/docs?version=2&utm_medium=social#intro')
+    expect(result).toContain('version=2')
+    expect(result).not.toContain('utm_medium')
+    expect(result).toContain('#intro')
+  })
 })
