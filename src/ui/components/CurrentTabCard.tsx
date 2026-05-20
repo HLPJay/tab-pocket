@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { BrowserTab } from '../../domain/browserTabTypes'
 import type { SavedTab } from '../../domain/savedTabTypes'
 import { getDomainFromUrl } from '../../services/urlFilterService'
@@ -36,6 +36,7 @@ export function CurrentTabCard({
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [activateError, setActivateError] = useState<string | null>(null)
+  const [showMoreActions, setShowMoreActions] = useState(false)
   const domain = getDomainFromUrl(tab.url)
   const isCaptured = capturedTab !== undefined
   const isActive = tab.active
@@ -163,7 +164,7 @@ export function CurrentTabCard({
         mousedownRef.current = false
       }}
     >
-      <div style={styles.header}>
+      <div style={styles.titleRow}>
         <div
           style={styles.tabInfo}
           onClick={handleActivate}
@@ -186,26 +187,115 @@ export function CurrentTabCard({
           )}
           <span style={styles.title}>{tab.title}</span>
         </div>
-        {tab.pinned && <span style={styles.badge}>固定</span>}
-        {tab.active && <span style={{ ...styles.badge, ...styles.activeBadge }}>当前</span>}
-        {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
+        <div style={styles.badges}>
+          {tab.active && <span style={{ ...styles.badge, ...styles.activeBadge }}>当前</span>}
+          {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
+        </div>
       </div>
 
-      <div
-        style={styles.domain}
-        onClick={handleActivate}
-        title="切换到这个标签页"
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && handleActivate()}
-      >
-        {domain}
+      <div style={styles.controlRow}>
+        <div style={styles.leftControls}>
+          <span
+            style={styles.domain}
+            onClick={handleActivate}
+            title="切换到这个标签页"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && handleActivate()}
+          >
+            {domain}
+          </span>
+          <button
+            onClick={onToggleNote}
+            disabled={busy}
+            style={busy ? styles.btnSecondaryDisabled : styles.btnNote}
+          >
+            {noteButtonLabel}
+          </button>
+          {isCaptured && noteExpanded && (
+            <button
+              onClick={handleSaveNote}
+              disabled={busy}
+              style={busy ? styles.btnDisabled : styles.btnSecondary}
+            >
+              {busy ? '处理中…' : '保存备注'}
+            </button>
+          )}
+        </div>
+
+        <div style={styles.primaryActions}>
+          {!isCaptured && (
+            <>
+              <button
+                onClick={handleCapture}
+                disabled={busy}
+                style={busy ? styles.btnDisabled : styles.btnPrimary}
+              >
+                收纳
+              </button>
+              <button
+                onClick={() => setShowMoreActions((v) => !v)}
+                disabled={busy}
+                style={busy ? styles.btnDisabled : styles.btnMore}
+              >
+                更多
+              </button>
+            </>
+          )}
+          {isCaptured && (
+            <button
+              onClick={() => setShowMoreActions((v) => !v)}
+              disabled={busy}
+              style={busy ? styles.btnDisabled : styles.btnMore}
+            >
+              更多
+            </button>
+          )}
+        </div>
       </div>
 
-      {duplicateOpenCount > 1 && (
-        <div style={styles.duplicateHint}>同一页面已打开 {duplicateOpenCount} 个</div>
+      {showMoreActions && (
+        <div style={styles.moreActionsRow}>
+          {!isCaptured ? (
+            <>
+              <button
+                onClick={handleCaptureAndClose}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDangerDisabled : styles.btnDanger}
+                title={closeTitle}
+              >
+                收纳并关闭
+              </button>
+              <button
+                onClick={handleCloseTab}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDangerDisabled : styles.btnDanger}
+                title={closeTitle}
+              >
+                关闭当前页
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleCancelCapture}
+                disabled={busy}
+                style={busy ? styles.btnDangerDisabled : styles.btnDanger}
+              >
+                取消收纳
+              </button>
+              <button
+                onClick={handleCloseTab}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDangerDisabled : styles.btnDanger}
+                title={closeTitle}
+              >
+                关闭当前页
+              </button>
+            </>
+          )}
+        </div>
       )}
-      {activateError && <div style={styles.activateError}>{activateError}</div>}
 
       {noteExpanded && (
         <textarea
@@ -220,96 +310,12 @@ export function CurrentTabCard({
         />
       )}
 
+      {duplicateOpenCount > 1 && (
+        <div style={styles.duplicateHint}>同一页面已打开 {duplicateOpenCount} 个</div>
+      )}
+
+      {activateError && <div style={styles.activateError}>{activateError}</div>}
       {error && <div style={styles.error}>{error}</div>}
-
-      <div style={styles.actionsRow}>
-        <div
-          style={styles.actionsLeft}
-          onMouseDown={() => {
-            mousedownRef.current = true
-          }}
-          onMouseUp={() => {
-            mousedownRef.current = false
-          }}
-        >
-          <button
-            onClick={onToggleNote}
-            disabled={busy}
-            style={busy ? styles.btnDisabled : styles.btnNote}
-          >
-            {noteButtonLabel}
-          </button>
-
-          {isCaptured && noteExpanded && (
-            <button
-              onClick={handleSaveNote}
-              disabled={busy}
-              style={busy ? styles.btnDisabled : styles.btn}
-            >
-              {busy ? '处理中…' : '保存备注'}
-            </button>
-          )}
-
-          {!isCaptured && (
-            <button
-              onClick={handleCapture}
-              disabled={busy}
-              style={busy ? styles.btnDisabled : styles.btn}
-            >
-              {busy ? '处理中…' : '收纳'}
-            </button>
-          )}
-        </div>
-
-        <div
-          style={styles.actionsRight}
-          onMouseDown={() => {
-            mousedownRef.current = true
-          }}
-          onMouseUp={() => {
-            mousedownRef.current = false
-          }}
-        >
-          {isCaptured ? (
-            <>
-              <button
-                onClick={handleCancelCapture}
-                disabled={busy}
-                style={busy ? styles.btnDisabled : styles.btnDanger}
-              >
-                {busy ? '处理中…' : '取消收纳'}
-              </button>
-              <button
-                onClick={handleCloseTab}
-                disabled={busy || closeDisabled}
-                style={busy || closeDisabled ? styles.btnDisabled : styles.btnDanger}
-                title={closeTitle}
-              >
-                {busy ? '处理中…' : '关闭当前页'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={handleCaptureAndClose}
-                disabled={busy || closeDisabled}
-                style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
-                title={closeTitle}
-              >
-                {busy ? '处理中…' : '收纳并关闭'}
-              </button>
-              <button
-                onClick={handleCloseTab}
-                disabled={busy || closeDisabled}
-                style={busy || closeDisabled ? styles.btnDisabled : styles.btnDanger}
-                title={closeTitle}
-              >
-                {busy ? '处理中…' : '关闭当前页'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
 
       {closeDisabled && <div style={styles.hint}>固定标签不可关闭</div>}
     </div>
@@ -331,11 +337,11 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeftColor: '#2563eb',
     boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.14)',
   },
-  header: {
+  titleRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    minWidth: 0,
+    justifyContent: 'space-between',
+    gap: 8,
   },
   tabInfo: {
     display: 'flex',
@@ -358,6 +364,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: '#111827',
   },
+  badges: {
+    display: 'flex',
+    gap: 6,
+    flexShrink: 0,
+  },
   badge: {
     flexShrink: 0,
     fontSize: 10,
@@ -375,6 +386,20 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#d1fae5',
     color: '#065f46',
   },
+  controlRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  leftControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    minWidth: 0,
+  },
   domain: {
     fontSize: 11,
     color: '#9ca3af',
@@ -382,6 +407,20 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     cursor: 'pointer',
+  },
+  primaryActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 'auto',
+    flexShrink: 0,
+  },
+  moreActionsRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 8,
+    paddingTop: 2,
+    flexWrap: 'wrap',
   },
   duplicateHint: {
     fontSize: 11,
@@ -414,22 +453,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#9ca3af',
     fontStyle: 'italic',
   },
-  actionsRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginTop: 2,
-  },
-  actionsLeft: {
-    display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  actionsRight: {
-    display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
   btnNote: {
     fontSize: 11,
     padding: '3px 8px',
@@ -439,13 +462,31 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#374151',
     cursor: 'pointer',
   },
-  btn: {
+  btnPrimary: {
     fontSize: 11,
     padding: '3px 8px',
     borderRadius: 4,
-    border: '1px solid #6366f1',
-    background: '#eef2ff',
-    color: '#4338ca',
+    border: '1px solid #3b82f6',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    cursor: 'pointer',
+  },
+  btnSecondary: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    background: '#fff',
+    color: '#374151',
+    cursor: 'pointer',
+  },
+  btnMore: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    background: '#f9fafb',
+    color: '#374151',
     cursor: 'pointer',
   },
   btnDanger: {
@@ -458,6 +499,24 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   btnDisabled: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    background: '#f9fafb',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+  },
+  btnSecondaryDisabled: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    background: '#f9fafb',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+  },
+  btnDangerDisabled: {
     fontSize: 11,
     padding: '3px 8px',
     borderRadius: 4,
