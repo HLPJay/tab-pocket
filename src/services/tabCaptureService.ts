@@ -34,6 +34,15 @@ export async function captureBrowserTab(
   const newTags = tag !== undefined ? (tag.trim() ? [tag.trim()] : []) : undefined
 
   const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
+  const resolvedSessionId = (() => {
+    if (options?.sessionId !== undefined) return options.sessionId
+    if (!existing) return undefined
+    if (existing.status === 'deleted') return undefined
+    if (!existing.sessionId) return undefined
+    const session = store.sessions[existing.sessionId]
+    if (!session || session.status !== 'active') return undefined
+    return existing.sessionId
+  })()
 
   if (existing) {
     if (existing.status !== 'deleted') {
@@ -41,7 +50,7 @@ export async function captureBrowserTab(
         ...existing,
         updatedAt: now,
         ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
-        ...(sessionId !== undefined ? { sessionId } : {}),
+        sessionId: resolvedSessionId,
         ...(newTags !== undefined ? { tags: newTags } : {}),
         ...(reviewStatus !== undefined ? { reviewStatus } : {}),
       }
@@ -55,7 +64,7 @@ export async function captureBrowserTab(
       deletedAt: undefined,
       updatedAt: now,
       ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
-      ...(sessionId !== undefined ? { sessionId } : {}),
+      sessionId: resolvedSessionId,
       ...(newTags !== undefined ? { tags: newTags } : {}),
       ...(reviewStatus !== undefined ? { reviewStatus } : {}),
     }
@@ -82,7 +91,7 @@ export async function captureBrowserTab(
     tags: newTags ?? [],
     reviewStatus: reviewStatus ?? 'unprocessed',
     ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
-    ...(sessionId !== undefined ? { sessionId } : {}),
+    ...(resolvedSessionId !== undefined ? { sessionId: resolvedSessionId } : {}),
   }
 
   store.tabs[saved.id] = saved

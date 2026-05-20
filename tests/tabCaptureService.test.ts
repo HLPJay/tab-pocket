@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StoreState } from '../src/domain/storeTypes'
 import type { SavedTab } from '../src/domain/savedTabTypes'
+import type { SavedSession } from '../src/domain/sessionTypes'
 
 vi.mock('../src/repositories/storageRepository', () => {
   const store: { state: StoreState } = { state: { version: 1, tabs: {}, sessions: {} } }
@@ -36,6 +37,16 @@ const existingTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
   openCount: 0,
   status: 'inbox',
   tags: [],
+  ...overrides,
+})
+
+const makeSession = (overrides: Partial<SavedSession> = {}): SavedSession => ({
+  id: 'session-1',
+  name: 'Test Session',
+  tabIds: [],
+  capturedAt: 1000,
+  updatedAt: 1000,
+  status: 'active',
   ...overrides,
 })
 
@@ -82,6 +93,7 @@ describe('captureBrowserTab — basic', () => {
     expect(result.id).toBe('existing-id')
     expect(result.status).toBe('inbox')
     expect(result.deletedAt).toBeUndefined()
+    expect(result.sessionId).toBeUndefined()
   })
 
   it('populates domain from URL', async () => {
@@ -111,7 +123,7 @@ describe('captureBrowserTab — sessionId handling', () => {
     expect(result.sessionId).toBe('new-session')
   })
 
-  it('updates sessionId on deleted restore', async () => {
+  it('writes sessionId on deleted restore when provided', async () => {
     vi.mocked(getStore).mockResolvedValue({
       version: 1,
       tabs: { 'existing-id': existingTab({ status: 'deleted', deletedAt: 2000 }) },
@@ -119,6 +131,77 @@ describe('captureBrowserTab — sessionId handling', () => {
     })
     const result = await captureBrowserTab(mockTab(), { sessionId: 'restored-session' })
     expect(result.sessionId).toBe('restored-session')
+  })
+})
+
+describe('captureBrowserTab 鈥?deleted session membership cleanup', () => {
+  it('clears sessionId when restoring a deleted tab from a deleted session', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ status: 'deleted', deletedAt: 2000, sessionId: 'session-1' }) },
+      sessions: { 'session-1': makeSession({ status: 'deleted' }) },
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.deletedAt).toBeUndefined()
+    expect(result.sessionId).toBeUndefined()
+  })
+
+  it('clears sessionId when restoring a deleted tab from a missing session', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ status: 'deleted', deletedAt: 2000, sessionId: 'missing-session' }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.deletedAt).toBeUndefined()
+    expect(result.sessionId).toBeUndefined()
+  })
+
+  it('clears sessionId when restoring a deleted tab from an active session in single capture flow', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ status: 'deleted', deletedAt: 2000, sessionId: 'session-1' }) },
+      sessions: { 'session-1': makeSession() },
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.deletedAt).toBeUndefined()
+    expect(result.sessionId).toBeUndefined()
+  })
+
+  it('clears sessionId when existing non-deleted tab points to a deleted session', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ sessionId: 'session-1' }) },
+      sessions: { 'session-1': makeSession({ status: 'deleted' }) },
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.sessionId).toBeUndefined()
+  })
+
+  it('clears sessionId when existing non-deleted tab points to a missing session', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ sessionId: 'missing-session' }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.sessionId).toBeUndefined()
+  })
+
+  it('keeps sessionId when existing non-deleted tab still belongs to an active session', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ sessionId: 'session-1' }) },
+      sessions: { 'session-1': makeSession() },
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.status).toBe('inbox')
+    expect(result.sessionId).toBe('session-1')
   })
 })
 
