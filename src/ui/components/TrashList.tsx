@@ -13,7 +13,6 @@ export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props
   const [busyId, setBusyId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
 
   const count = tabs.length
 
@@ -128,6 +127,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     fontSize: 13,
     color: '#6b7280',
+    background: '#fff',
   },
   card: {
     padding: '8px 12px',

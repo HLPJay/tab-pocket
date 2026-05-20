@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
 import type { SessionTabInput } from '../../src/services/sessionCaptureService'
 import { activateBrowserTab } from '../../src/services/tabActivateService'
@@ -14,6 +14,7 @@ import { WindowCapturePanel } from '../../src/ui/components/WindowCapturePanel'
 import { InboxList } from '../../src/ui/components/InboxList'
 import { TrashList } from '../../src/ui/components/TrashList'
 import { SessionList } from '../../src/ui/components/SessionList'
+import { SectionNav, type SectionNavKey } from '../../src/ui/components/SectionNav'
 import { normalizeStore } from '../../src/services/storeNormalizeService'
 import { isUngroupedInboxTab } from '../../src/services/savedTabVisibilityService'
 import { selectCapturedTabsByNormalizedUrl } from '../../src/services/savedTabSelectService'
@@ -23,6 +24,12 @@ export function App() {
   const [loadingCurrent, setLoadingCurrent] = useState(true)
   const [currentError, setCurrentError] = useState<string | null>(null)
   const [showWindowCapture, setShowWindowCapture] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const currentSectionRef = useRef<HTMLDivElement>(null)
+  const sessionsSectionRef = useRef<HTMLDivElement>(null)
+  const inboxSectionRef = useRef<HTMLDivElement>(null)
+  const trashSectionRef = useRef<HTMLDivElement>(null)
 
   const {
     savedTabs,
@@ -63,11 +70,16 @@ export function App() {
     }
   }, [])
 
-  const refresh = useCallback(() => {
-    loadCurrentTabs()
-    loadSavedTabs()
-    loadSavedSessions()
-  }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
+  const refresh = useCallback(async () => {
+    if (refreshing) return
+
+    setRefreshing(true)
+    try {
+      await Promise.all([loadCurrentTabs(), loadSavedTabs(), loadSavedSessions()])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [refreshing, loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
   useEffect(() => {
     const init = async () => {
@@ -76,16 +88,18 @@ export function App() {
       } catch {
         // normalize failure must not white-screen the app
       }
-      loadCurrentTabs()
-      loadSavedTabs()
-      loadSavedSessions()
+      await refresh()
     }
-    init()
-  }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
+    void init()
+  }, [refresh])
 
-  const handleActivate = useCallback(async (tab: BrowserTab) => {
-    await activateBrowserTab(tab)
-  }, [])
+  const handleActivate = useCallback(
+    async (tab: BrowserTab) => {
+      await activateBrowserTab(tab)
+      await loadCurrentTabs()
+    },
+    [loadCurrentTabs]
+  )
 
   const handleCapture = useCallback(
     async (tab: BrowserTab, note: string) => {
@@ -173,73 +187,115 @@ export function App() {
   const capturedTabsByNormalizedUrl = selectCapturedTabsByNormalizedUrl(savedTabs, sessionsById)
   const tabsById = Object.fromEntries(savedTabs.map((t) => [t.id, t]))
 
+  const sectionRefs: Record<SectionNavKey, React.RefObject<HTMLDivElement>> = {
+    current: currentSectionRef,
+    sessions: sessionsSectionRef,
+    inbox: inboxSectionRef,
+    trash: trashSectionRef,
+  }
+
+  const handleSelectSection = useCallback((key: SectionNavKey) => {
+    sectionRefs[key].current?.scrollIntoView({
+      block: 'start',
+      behavior: 'smooth',
+    })
+  }, [])
+
   return (
     <div style={styles.root}>
       <header style={styles.header}>
         <h1 style={styles.title}>Tab Pocket</h1>
-        <button onClick={refresh} style={styles.refreshBtn} title="刷新">
-          ↻
+        <button
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          style={refreshing ? styles.refreshBtnBusy : styles.refreshBtn}
+          title={refreshing ? '刷新中…' : '刷新'}
+        >
+          {refreshing ? '刷新中…' : '↻'}
         </button>
       </header>
 
+      <SectionNav
+        items={[
+          { key: 'current', label: '当前打开', count: currentTabs.length, tone: 'current' },
+          { key: 'sessions', label: 'Sessions', count: activeSessions.length, tone: 'sessions' },
+          { key: 'inbox', label: '未分组', count: ungroupedTabs.length, tone: 'inbox' },
+          { key: 'trash', label: '回收站', count: trashTabs.length, tone: 'trash' },
+        ]}
+        onSelect={handleSelectSection}
+      />
+
       <main style={styles.main}>
-        <CollapsibleSection title="当前打开" count={currentTabs.length} defaultExpanded tone="current">
-          <div style={styles.captureRow}>
-            <button
-              onClick={() => setShowWindowCapture(true)}
-              disabled={loadingCurrent || showWindowCapture}
-              style={loadingCurrent || showWindowCapture ? styles.quickBtnBusy : styles.quickBtn}
-            >
-              收纳当前窗口
-            </button>
-          </div>
-          {showWindowCapture && (
-            <WindowCapturePanel
+        <div ref={currentSectionRef}>
+          <CollapsibleSection title="当前打开" count={currentTabs.length} defaultExpanded tone="current">
+            <div style={styles.captureRow}>
+              <button
+                onClick={() => setShowWindowCapture((v) => !v)}
+                disabled={loadingCurrent}
+                style={loadingCurrent ? styles.quickBtnBusy : styles.quickBtn}
+              >
+                {showWindowCapture ? '收起批量收纳' : '收纳当前窗口'}
+              </button>
+            </div>
+            {showWindowCapture && (
+              <WindowCapturePanel
+                tabs={currentTabs}
+                onConfirm={handleWindowCaptureConfirm}
+                onConfirmAndClose={handleWindowCaptureConfirmAndClose}
+                onCancel={() => setShowWindowCapture(false)}
+              />
+            )}
+            <CurrentTabsList
               tabs={currentTabs}
-              onConfirm={handleWindowCaptureConfirm}
-              onConfirmAndClose={handleWindowCaptureConfirmAndClose}
-              onCancel={() => setShowWindowCapture(false)}
+              loading={loadingCurrent}
+              error={currentError}
+              capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
+              onActivate={handleActivate}
+              onCapture={handleCapture}
+              onCaptureAndClose={handleCaptureAndClose}
+              onCancelCapture={deleteTab}
+              onCloseTab={handleCloseTab}
+              onSaveNote={handleSaveNote}
             />
-          )}
-          <CurrentTabsList
-            tabs={currentTabs}
-            loading={loadingCurrent}
-            error={currentError}
-            capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
-            onActivate={handleActivate}
-            onCapture={handleCapture}
-            onCaptureAndClose={handleCaptureAndClose}
-            onCancelCapture={deleteTab}
-            onCloseTab={handleCloseTab}
-            onSaveNote={handleSaveNote}
-          />
-        </CollapsibleSection>
+          </CollapsibleSection>
+        </div>
 
-        <CollapsibleSection title="Sessions" count={activeSessions.length} defaultExpanded={false} tone="sessions">
-          <SessionList
-            sessions={activeSessions}
-            tabsById={tabsById}
-            loading={loadingSessions}
-            error={sessionError}
-            onOpenTab={openTab}
-            onDeleteTab={deleteTab}
-            onDeleteSession={handleDeleteSession}
-            onOpenAll={handleOpenSession}
-          />
-        </CollapsibleSection>
+        <div ref={sessionsSectionRef}>
+          <CollapsibleSection title="Sessions" count={activeSessions.length} defaultExpanded={false} tone="sessions">
+            <SessionList
+              sessions={activeSessions}
+              tabsById={tabsById}
+              loading={loadingSessions}
+              error={sessionError}
+              onOpenTab={openTab}
+              onDeleteTab={deleteTab}
+              onDeleteSession={handleDeleteSession}
+              onOpenAll={handleOpenSession}
+            />
+          </CollapsibleSection>
+        </div>
 
-        <CollapsibleSection title="未分组收纳" count={ungroupedTabs.length} defaultExpanded={false} tone="inbox">
-          <InboxList
-            tabs={ungroupedTabs}
-            loading={loadingSaved}
-            error={savedError}
-            onOpen={openTab}
-            onDelete={deleteTab}
-            onUpdateMeta={handleUpdateTabMeta}
-          />
-        </CollapsibleSection>
+        <div ref={inboxSectionRef}>
+          <CollapsibleSection title="未分组" count={ungroupedTabs.length} defaultExpanded={false} tone="inbox">
+            <InboxList
+              tabs={ungroupedTabs}
+              loading={loadingSaved}
+              error={savedError}
+              onOpen={openTab}
+              onDelete={deleteTab}
+              onUpdateMeta={handleUpdateTabMeta}
+            />
+          </CollapsibleSection>
+        </div>
 
-        <TrashList tabs={trashTabs} onRestore={restoreTab} onHardDelete={hardDeleteTab} onClearTrash={handleClearTrash} />
+        <div ref={trashSectionRef}>
+          <TrashList
+            tabs={trashTabs}
+            onRestore={restoreTab}
+            onHardDelete={hardDeleteTab}
+            onClearTrash={handleClearTrash}
+          />
+        </div>
       </main>
     </div>
   )
@@ -248,10 +304,11 @@ export function App() {
 const styles: Record<string, React.CSSProperties> = {
   root: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    minHeight: '100vh',
-    background: '#fff',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
+    background: '#fff',
   },
   header: {
     flexShrink: 0,
@@ -261,8 +318,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 16px',
     borderBottom: '1px solid #e5e7eb',
     background: '#fff',
-    position: 'sticky',
-    top: 0,
     zIndex: 20,
   },
   title: {
@@ -277,6 +332,16 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     color: '#6b7280',
+    lineHeight: 1,
+    padding: '2px 6px',
+    borderRadius: 4,
+  },
+  refreshBtnBusy: {
+    fontSize: 14,
+    background: 'none',
+    border: 'none',
+    cursor: 'not-allowed',
+    color: '#9ca3af',
     lineHeight: 1,
     padding: '2px 6px',
     borderRadius: 4,

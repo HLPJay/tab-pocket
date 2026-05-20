@@ -18,24 +18,21 @@ export function CollapsibleSection({
   children,
 }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-
   const label = count !== undefined ? `${title} · ${count} ${countUnit(title)}` : title
 
-  const handleToggle = () => {
-    setExpanded((v) => !v)
-  }
+  const toggle = () => setExpanded((v) => !v)
 
   return (
     <section>
       <div
         style={{ ...styles.bar, ...toneStyles[tone] }}
-        onClick={handleToggle}
+        onClick={toggle}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            handleToggle()
+            toggle()
           }
         }}
       >
@@ -50,7 +47,7 @@ export function CollapsibleSection({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              handleToggle()
+              toggle()
             }}
             style={styles.toggleBtn}
           >
@@ -77,9 +74,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid #e5e7eb',
     borderLeft: '4px solid transparent',
     background: '#f8fafc',
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
     cursor: 'pointer',
     transition: 'background-color 0.15s ease, border-color 0.15s ease',
   },
@@ -106,20 +100,8 @@ const styles: Record<string, React.CSSProperties> = {
 }
 
 const toneStyles: Record<NonNullable<Props['tone']>, React.CSSProperties> = {
-  current: {
-    background: '#eff6ff',
-    borderLeftColor: '#2563eb',
-  },
-  sessions: {
-    background: '#f5f3ff',
-    borderLeftColor: '#7c3aed',
-  },
-  inbox: {
-    background: '#ecfdf5',
-    borderLeftColor: '#059669',
-  },
-  trash: {
-    background: '#fef2f2',
-    borderLeftColor: '#dc2626',
-  },
+  current: { background: '#eff6ff', borderLeftColor: '#2563eb' },
+  sessions: { background: '#f5f3ff', borderLeftColor: '#7c3aed' },
+  inbox: { background: '#ecfdf5', borderLeftColor: '#059669' },
+  trash: { background: '#fef2f2', borderLeftColor: '#dc2626' },
 }
