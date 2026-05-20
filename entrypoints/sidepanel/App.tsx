@@ -83,12 +83,9 @@ export function App() {
     init()
   }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
-  const handleActivate = useCallback(
-    async (tab: BrowserTab) => {
-      await activateBrowserTab(tab)
-    },
-    []
-  )
+  const handleActivate = useCallback(async (tab: BrowserTab) => {
+    await activateBrowserTab(tab)
+  }, [])
 
   const handleCapture = useCallback(
     async (tab: BrowserTab, note: string) => {
@@ -154,7 +151,6 @@ export function App() {
     [openSession]
   )
 
-  // Delete session and then reload savedTabs so "已收纳" clears immediately
   const handleDeleteSession = useCallback(
     async (id: string) => {
       await deleteSession(id)
@@ -174,96 +170,77 @@ export function App() {
   const activeSessions = savedSessions.filter((s) => s.status === 'active')
   const ungroupedTabs = savedTabs.filter((t) => isUngroupedInboxTab(t, sessionsById))
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
-
   const capturedTabsByNormalizedUrl = selectCapturedTabsByNormalizedUrl(savedTabs, sessionsById)
-
   const tabsById = Object.fromEntries(savedTabs.map((t) => [t.id, t]))
 
   return (
     <div style={styles.root}>
       <header style={styles.header}>
         <h1 style={styles.title}>Tab Pocket</h1>
-        <button onClick={refresh} style={styles.refreshBtn} title="刷新">↻</button>
+        <button onClick={refresh} style={styles.refreshBtn} title="刷新">
+          ↻
+        </button>
       </header>
 
-      {/* 当前打开 */}
-      <CollapsibleSection
-        title="当前打开"
-        count={currentTabs.length}
-        defaultExpanded={true}
-      >
-        <div style={styles.captureRow}>
-          <button
-            onClick={() => setShowWindowCapture(true)}
-            disabled={loadingCurrent || showWindowCapture}
-            style={loadingCurrent || showWindowCapture ? styles.quickBtnBusy : styles.quickBtn}
-          >
-            收纳当前窗口
-          </button>
-        </div>
-        {showWindowCapture && (
-          <WindowCapturePanel
+      <main style={styles.main}>
+        <CollapsibleSection title="当前打开" count={currentTabs.length} defaultExpanded tone="current">
+          <div style={styles.captureRow}>
+            <button
+              onClick={() => setShowWindowCapture(true)}
+              disabled={loadingCurrent || showWindowCapture}
+              style={loadingCurrent || showWindowCapture ? styles.quickBtnBusy : styles.quickBtn}
+            >
+              收纳当前窗口
+            </button>
+          </div>
+          {showWindowCapture && (
+            <WindowCapturePanel
+              tabs={currentTabs}
+              onConfirm={handleWindowCaptureConfirm}
+              onConfirmAndClose={handleWindowCaptureConfirmAndClose}
+              onCancel={() => setShowWindowCapture(false)}
+            />
+          )}
+          <CurrentTabsList
             tabs={currentTabs}
-            onConfirm={handleWindowCaptureConfirm}
-            onConfirmAndClose={handleWindowCaptureConfirmAndClose}
-            onCancel={() => setShowWindowCapture(false)}
+            loading={loadingCurrent}
+            error={currentError}
+            capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
+            onActivate={handleActivate}
+            onCapture={handleCapture}
+            onCaptureAndClose={handleCaptureAndClose}
+            onCancelCapture={deleteTab}
+            onCloseTab={handleCloseTab}
+            onSaveNote={handleSaveNote}
           />
-        )}
-        <CurrentTabsList
-          tabs={currentTabs}
-          loading={loadingCurrent}
-          error={currentError}
-          capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
-          onActivate={handleActivate}
-          onCapture={handleCapture}
-          onCaptureAndClose={handleCaptureAndClose}
-          onCancelCapture={deleteTab}
-          onCloseTab={handleCloseTab}
-          onSaveNote={handleSaveNote}
-        />
-      </CollapsibleSection>
+        </CollapsibleSection>
 
-      {/* Sessions */}
-      <CollapsibleSection
-        title="Sessions"
-        count={activeSessions.length}
-        defaultExpanded={false}
-      >
-        <SessionList
-          sessions={activeSessions}
-          tabsById={tabsById}
-          loading={loadingSessions}
-          error={sessionError}
-          onOpenTab={openTab}
-          onDeleteTab={deleteTab}
-          onDeleteSession={handleDeleteSession}
-          onOpenAll={handleOpenSession}
-        />
-      </CollapsibleSection>
+        <CollapsibleSection title="Sessions" count={activeSessions.length} defaultExpanded={false} tone="sessions">
+          <SessionList
+            sessions={activeSessions}
+            tabsById={tabsById}
+            loading={loadingSessions}
+            error={sessionError}
+            onOpenTab={openTab}
+            onDeleteTab={deleteTab}
+            onDeleteSession={handleDeleteSession}
+            onOpenAll={handleOpenSession}
+          />
+        </CollapsibleSection>
 
-      {/* 未分组收纳 */}
-      <CollapsibleSection
-        title="未分组收纳"
-        count={ungroupedTabs.length}
-        defaultExpanded={false}
-      >
-        <InboxList
-          tabs={ungroupedTabs}
-          loading={loadingSaved}
-          error={savedError}
-          onOpen={openTab}
-          onDelete={deleteTab}
-          onUpdateMeta={handleUpdateTabMeta}
-        />
-      </CollapsibleSection>
+        <CollapsibleSection title="未分组收纳" count={ungroupedTabs.length} defaultExpanded={false} tone="inbox">
+          <InboxList
+            tabs={ungroupedTabs}
+            loading={loadingSaved}
+            error={savedError}
+            onOpen={openTab}
+            onDelete={deleteTab}
+            onUpdateMeta={handleUpdateTabMeta}
+          />
+        </CollapsibleSection>
 
-      {/* 回收站 */}
-      <TrashList
-        tabs={trashTabs}
-        onRestore={restoreTab}
-        onHardDelete={hardDeleteTab}
-        onClearTrash={handleClearTrash}
-      />
+        <TrashList tabs={trashTabs} onRestore={restoreTab} onHardDelete={hardDeleteTab} onClearTrash={handleClearTrash} />
+      </main>
     </div>
   )
 }
@@ -273,13 +250,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     minHeight: '100vh',
     background: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 16px',
     borderBottom: '1px solid #e5e7eb',
+    background: '#fff',
+    position: 'sticky',
+    top: 0,
+    zIndex: 20,
   },
   title: {
     margin: 0,
@@ -296,6 +280,11 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     padding: '2px 6px',
     borderRadius: 4,
+  },
+  main: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
   },
   captureRow: {
     padding: '6px 12px 4px',

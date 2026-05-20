@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SavedTab } from '../../domain/savedTabTypes'
+import { CollapsibleSection } from './CollapsibleSection'
 
 type Props = {
   tabs: SavedTab[]
@@ -9,10 +10,10 @@ type Props = {
 }
 
 export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props) {
-  const [expanded, setExpanded] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   const count = tabs.length
 
@@ -54,44 +55,39 @@ export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props
   }
 
   return (
-    <section>
-      <div style={styles.bar}>
-        <span style={styles.sectionLabel}>回收站 · {count} 项</span>
-        <div style={styles.barActions}>
-          {expanded && count > 0 && (
-            <button
-              onClick={handleClearTrash}
-              disabled={clearing || busyId !== null}
-              style={clearing || busyId !== null ? styles.btnDisabled : styles.btnDanger}
-            >
-              {clearing ? '清空中…' : '清空'}
-            </button>
-          )}
-          {count > 0 && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              disabled={clearing || busyId !== null}
-              style={clearing || busyId !== null ? styles.btnDisabled : styles.btnToggle}
-            >
-              {expanded ? '收起' : '展开'}
-            </button>
-          )}
-        </div>
-      </div>
-
+    <CollapsibleSection
+      title="回收站"
+      count={count}
+      defaultExpanded={false}
+      tone="trash"
+      rightActions={
+        count > 0 ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              void handleClearTrash()
+            }}
+            disabled={clearing || busyId !== null}
+            style={clearing || busyId !== null ? styles.btnDisabled : styles.btnDanger}
+          >
+            {clearing ? '清空中…' : '清空'}
+          </button>
+        ) : null
+      }
+    >
       {error && <div style={styles.error}>{error}</div>}
 
-      {!expanded && count === 0 && (
+      {count === 0 ? (
         <div style={styles.state}>暂无删除记录</div>
-      )}
-
-      {expanded && (
+      ) : (
         <div>
           {tabs.map((tab) => {
             const busy = busyId === tab.id
             return (
               <div key={tab.id} style={styles.card}>
-                <div style={styles.title} title={tab.title}>{tab.title}</div>
+                <div style={styles.title} title={tab.title}>
+                  {tab.title}
+                </div>
                 <div style={styles.meta}>
                   <span>{tab.domain}</span>
                   {tab.deletedAt && (
@@ -122,30 +118,11 @@ export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props
           })}
         </div>
       )}
-    </section>
+    </CollapsibleSection>
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  bar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '8px 12px 4px',
-    borderTop: '1px solid #f3f4f6',
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  barActions: {
-    display: 'flex',
-    gap: 6,
-    alignItems: 'center',
-  },
   state: {
     padding: '16px',
     textAlign: 'center',
@@ -158,6 +135,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 3,
+    background: '#fff',
   },
   title: {
     fontSize: 12,
@@ -171,6 +149,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
     fontSize: 11,
     color: '#9ca3af',
+    flexWrap: 'wrap',
   },
   dot: {},
   actions: {
@@ -182,15 +161,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: '#dc2626',
     padding: '0 12px 4px',
-  },
-  btnToggle: {
-    fontSize: 11,
-    padding: '2px 8px',
-    borderRadius: 4,
-    border: '1px solid #d1d5db',
-    background: '#f9fafb',
-    color: '#374151',
-    cursor: 'pointer',
+    background: '#fff',
   },
   btnRestore: {
     fontSize: 11,

@@ -4,6 +4,7 @@ type Props = {
   title: string
   count?: number
   defaultExpanded?: boolean
+  tone?: 'current' | 'sessions' | 'inbox' | 'trash'
   rightActions?: React.ReactNode
   children: React.ReactNode
 }
@@ -12,6 +13,7 @@ export function CollapsibleSection({
   title,
   count,
   defaultExpanded = true,
+  tone = 'current',
   rightActions,
   children,
 }: Props) {
@@ -19,14 +21,37 @@ export function CollapsibleSection({
 
   const label = count !== undefined ? `${title} · ${count} ${countUnit(title)}` : title
 
+  const handleToggle = () => {
+    setExpanded((v) => !v)
+  }
+
   return (
     <section>
-      <div style={styles.bar}>
+      <div
+        style={{ ...styles.bar, ...toneStyles[tone] }}
+        onClick={handleToggle}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleToggle()
+          }
+        }}
+      >
         <span style={styles.label}>{label}</span>
-        <div style={styles.barRight}>
+        <div
+          style={styles.barRight}
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
+        >
           {rightActions}
           <button
-            onClick={() => setExpanded((v) => !v)}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleToggle()
+            }}
             style={styles.toggleBtn}
           >
             {expanded ? '收起' : '展开'}
@@ -48,20 +73,26 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '8px 12px 4px',
-    borderTop: '1px solid #f3f4f6',
+    padding: '8px 12px',
+    borderTop: '1px solid #e5e7eb',
+    borderLeft: '4px solid transparent',
+    background: '#f8fafc',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    cursor: 'pointer',
+    transition: 'background-color 0.15s ease, border-color 0.15s ease',
   },
   label: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 600,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
+    color: '#334155',
   },
   barRight: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
+    cursor: 'default',
   },
   toggleBtn: {
     fontSize: 11,
@@ -71,5 +102,24 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f9fafb',
     color: '#374151',
     cursor: 'pointer',
+  },
+}
+
+const toneStyles: Record<NonNullable<Props['tone']>, React.CSSProperties> = {
+  current: {
+    background: '#eff6ff',
+    borderLeftColor: '#2563eb',
+  },
+  sessions: {
+    background: '#f5f3ff',
+    borderLeftColor: '#7c3aed',
+  },
+  inbox: {
+    background: '#ecfdf5',
+    borderLeftColor: '#059669',
+  },
+  trash: {
+    background: '#fef2f2',
+    borderLeftColor: '#dc2626',
   },
 }

@@ -38,8 +38,8 @@ export function CurrentTabCard({
   const [activateError, setActivateError] = useState<string | null>(null)
   const domain = getDomainFromUrl(tab.url)
   const isCaptured = capturedTab !== undefined
+  const isActive = tab.active
 
-  // Pre-fill note from capturedTab when expanding in captured state
   const prevExpandedRef = useRef(noteExpanded)
   useEffect(() => {
     const wasExpanded = prevExpandedRef.current
@@ -49,7 +49,6 @@ export function CurrentTabCard({
     }
   })
 
-  // Track whether a button mousedown is pending (to not collapse on blur before click)
   const mousedownRef = useRef(false)
 
   const handleCapture = async () => {
@@ -131,7 +130,6 @@ export function CurrentTabCard({
   }
 
   const handleNoteBlur = () => {
-    // If a button inside this card was just clicked, don't collapse
     if (mousedownRef.current) return
     if (!note.trim()) {
       onCollapseNote()
@@ -145,6 +143,7 @@ export function CurrentTabCard({
   }
 
   const closeDisabled = tab.pinned
+  const closeTitle = closeDisabled ? '固定标签不可关闭' : undefined
 
   const noteButtonLabel = noteExpanded
     ? '收起备注'
@@ -156,8 +155,13 @@ export function CurrentTabCard({
 
   return (
     <div
-      style={styles.card}
-      onMouseDown={() => { mousedownRef.current = false }}
+      style={{
+        ...styles.card,
+        ...(isActive ? styles.activeCard : null),
+      }}
+      onMouseDown={() => {
+        mousedownRef.current = false
+      }}
     >
       <div style={styles.header}>
         <div
@@ -175,7 +179,9 @@ export function CurrentTabCard({
               width={16}
               height={16}
               style={styles.favicon}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none'
+              }}
             />
           )}
           <span style={styles.title}>{tab.title}</span>
@@ -184,6 +190,7 @@ export function CurrentTabCard({
         {tab.active && <span style={{ ...styles.badge, ...styles.activeBadge }}>当前</span>}
         {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
+
       <div
         style={styles.domain}
         onClick={handleActivate}
@@ -194,6 +201,7 @@ export function CurrentTabCard({
       >
         {domain}
       </div>
+
       {duplicateOpenCount > 1 && (
         <div style={styles.duplicateHint}>同一页面已打开 {duplicateOpenCount} 个</div>
       )}
@@ -215,11 +223,14 @@ export function CurrentTabCard({
       {error && <div style={styles.error}>{error}</div>}
 
       <div style={styles.actionsRow}>
-        {/* Left: safe actions */}
         <div
           style={styles.actionsLeft}
-          onMouseDown={() => { mousedownRef.current = true }}
-          onMouseUp={() => { mousedownRef.current = false }}
+          onMouseDown={() => {
+            mousedownRef.current = true
+          }}
+          onMouseUp={() => {
+            mousedownRef.current = false
+          }}
         >
           <button
             onClick={onToggleNote}
@@ -250,11 +261,14 @@ export function CurrentTabCard({
           )}
         </div>
 
-        {/* Right: risk actions */}
         <div
           style={styles.actionsRight}
-          onMouseDown={() => { mousedownRef.current = true }}
-          onMouseUp={() => { mousedownRef.current = false }}
+          onMouseDown={() => {
+            mousedownRef.current = true
+          }}
+          onMouseUp={() => {
+            mousedownRef.current = false
+          }}
         >
           {isCaptured ? (
             <>
@@ -269,27 +283,35 @@ export function CurrentTabCard({
                 onClick={handleCloseTab}
                 disabled={busy || closeDisabled}
                 style={busy || closeDisabled ? styles.btnDisabled : styles.btnDanger}
-                title={closeDisabled ? '固定标签不可关闭' : undefined}
+                title={closeTitle}
               >
                 {busy ? '处理中…' : '关闭当前页'}
               </button>
             </>
           ) : (
-            <button
-              onClick={handleCaptureAndClose}
-              disabled={busy || closeDisabled}
-              style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
-              title={closeDisabled ? '固定标签不可关闭' : undefined}
-            >
-              {busy ? '处理中…' : '收纳并关闭'}
-            </button>
+            <>
+              <button
+                onClick={handleCaptureAndClose}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
+                title={closeTitle}
+              >
+                {busy ? '处理中…' : '收纳并关闭'}
+              </button>
+              <button
+                onClick={handleCloseTab}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDisabled : styles.btnDanger}
+                title={closeTitle}
+              >
+                {busy ? '处理中…' : '关闭当前页'}
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {closeDisabled && (
-        <div style={styles.hint}>固定标签不可关闭</div>
-      )}
+      {closeDisabled && <div style={styles.hint}>固定标签不可关闭</div>}
     </div>
   )
 }
@@ -301,6 +323,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
+    background: '#fff',
+    borderLeft: '4px solid transparent',
+  },
+  activeCard: {
+    background: '#eff6ff',
+    borderLeftColor: '#2563eb',
+    boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.14)',
   },
   header: {
     display: 'flex',
@@ -332,14 +361,15 @@ const styles: Record<string, React.CSSProperties> = {
   badge: {
     flexShrink: 0,
     fontSize: 10,
-    padding: '1px 5px',
-    borderRadius: 4,
+    padding: '1px 6px',
+    borderRadius: 999,
     background: '#e5e7eb',
     color: '#6b7280',
   },
   activeBadge: {
     background: '#dbeafe',
     color: '#1d4ed8',
+    border: '1px solid #93c5fd',
   },
   capturedBadge: {
     background: '#d1fae5',
@@ -373,6 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.4,
     boxSizing: 'border-box',
     outline: 'none',
+    background: '#fff',
   },
   error: {
     fontSize: 11,
