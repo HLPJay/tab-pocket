@@ -115,6 +115,49 @@ export function App() {
     }
   }, [loadAllData])
 
+  useEffect(() => {
+    let pending = false
+
+    const syncCurrentTabs = () => {
+      if (pending) return
+      pending = true
+      queueMicrotask(() => {
+        pending = false
+        void loadCurrentTabs()
+      })
+    }
+
+    const handleUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (
+        changeInfo.url !== undefined ||
+        changeInfo.title !== undefined ||
+        changeInfo.favIconUrl !== undefined ||
+        changeInfo.status !== undefined ||
+        changeInfo.pinned !== undefined
+      ) {
+        syncCurrentTabs()
+      }
+    }
+
+    chrome.tabs.onCreated.addListener(syncCurrentTabs)
+    chrome.tabs.onRemoved.addListener(syncCurrentTabs)
+    chrome.tabs.onActivated.addListener(syncCurrentTabs)
+    chrome.tabs.onMoved.addListener(syncCurrentTabs)
+    chrome.tabs.onAttached.addListener(syncCurrentTabs)
+    chrome.tabs.onDetached.addListener(syncCurrentTabs)
+    chrome.tabs.onUpdated.addListener(handleUpdated)
+
+    return () => {
+      chrome.tabs.onCreated.removeListener(syncCurrentTabs)
+      chrome.tabs.onRemoved.removeListener(syncCurrentTabs)
+      chrome.tabs.onActivated.removeListener(syncCurrentTabs)
+      chrome.tabs.onMoved.removeListener(syncCurrentTabs)
+      chrome.tabs.onAttached.removeListener(syncCurrentTabs)
+      chrome.tabs.onDetached.removeListener(syncCurrentTabs)
+      chrome.tabs.onUpdated.removeListener(handleUpdated)
+    }
+  }, [loadCurrentTabs])
+
   const handleActivate = useCallback(
     async (tab: BrowserTab) => {
       await activateBrowserTab(tab)
@@ -225,19 +268,26 @@ export function App() {
     trash: trashSectionRef,
   }
 
-  const handleSelectSection = useCallback((key: SectionNavKey) => {
-    setSectionExpanded((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }))
+  const handleSelectSection = useCallback(
+    (key: SectionNavKey) => {
+      setSectionExpanded((prev) => ({
+        ...prev,
+        [key]: !prev[key],
+      }))
 
-    requestAnimationFrame(() => {
-      sectionRefs[key].current?.scrollIntoView({
-        block: 'start',
-        behavior: 'smooth',
+      if (key === 'current') {
+        void loadCurrentTabs()
+      }
+
+      requestAnimationFrame(() => {
+        sectionRefs[key].current?.scrollIntoView({
+          block: 'start',
+          behavior: 'smooth',
+        })
       })
-    })
-  }, [])
+    },
+    [loadCurrentTabs]
+  )
 
   return (
     <div style={styles.root}>

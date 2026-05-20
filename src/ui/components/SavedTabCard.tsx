@@ -78,45 +78,51 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
   return (
     <div style={styles.card}>
       <div style={styles.title} title={tab.title}>{tab.title}</div>
-      <div style={styles.metaRow}>
-        {onUpdateMeta ? (
-          <select
-            value={tagLabel}
-            onChange={(e) => handleTagChange(e.target.value)}
-            style={styles.tagSelect}
-            disabled={busy}
-          >
-            <option value="">无标签</option>
-            {PRESET_TAGS.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        ) : (
-          tagLabel && <span style={styles.tag}>#{tagLabel}</span>
-        )}
-        {onUpdateMeta ? (
-          <select
-            value={effectiveStatus}
-            onChange={(e) => handleReviewStatusChange(e.target.value as SavedTabReviewStatus)}
-            style={styles.statusSelect}
-            disabled={busy}
-          >
-            {REVIEW_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        ) : (
-          <span style={styles.reviewBadge}>{REVIEW_LABEL[effectiveStatus]}</span>
-        )}
-        {onUpdateMeta && (
-          <InlineNoteEditor
-            note={tab.note}
-            disabled={busy}
-            onSave={handleNoteSave}
-            compact
-            hideSummary
-          />
-        )}
+      <div style={styles.controlRow}>
+        <div style={styles.metaControls}>
+          {onUpdateMeta ? (
+            <select
+              value={tagLabel}
+              onChange={(e) => handleTagChange(e.target.value)}
+              style={styles.tagSelect}
+              disabled={busy}
+            >
+              <option value="">无标签</option>
+              {PRESET_TAGS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            tagLabel && <span style={styles.tag}>#{tagLabel}</span>
+          )}
+          {onUpdateMeta ? (
+            <select
+              value={effectiveStatus}
+              onChange={(e) => handleReviewStatusChange(e.target.value as SavedTabReviewStatus)}
+              style={styles.statusSelect}
+              disabled={busy}
+            >
+              {REVIEW_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          ) : (
+            <span style={styles.reviewBadge}>{REVIEW_LABEL[effectiveStatus]}</span>
+          )}
+          {onUpdateMeta && (
+            <InlineNoteEditor
+              note={tab.note}
+              disabled={busy}
+              onSave={handleNoteSave}
+              compact
+              hideSummary
+            />
+          )}
+        </div>
+        <div style={styles.actionsInline}>
+          <button onClick={handleOpen} disabled={busy} style={styles.btnPrimary}>打开</button>
+          <button onClick={handleDelete} disabled={busy} style={styles.btnDanger}>删除</button>
+        </div>
       </div>
       {tab.note && <div style={styles.note}>{tab.note}</div>}
       <div style={styles.meta}>
@@ -131,10 +137,6 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
         )}
       </div>
       {error && <div style={styles.error}>{error}</div>}
-      <div style={styles.actions}>
-        <button onClick={handleOpen} disabled={busy} style={styles.btnPrimary}>打开</button>
-        <button onClick={handleDelete} disabled={busy} style={styles.btnDanger}>删除</button>
-      </div>
     </div>
   )
 }
@@ -145,7 +147,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #e5e7eb',
     display: 'flex',
     flexDirection: 'column',
-    gap: 3,
+    gap: 4,
   },
   title: {
     fontSize: 13,
@@ -155,11 +157,25 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  metaRow: {
+  controlRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metaControls: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
     flexWrap: 'wrap',
+    minWidth: 0,
+  },
+  actionsInline: {
+    display: 'flex',
+    gap: 6,
+    marginLeft: 'auto',
+    flexShrink: 0,
   },
   tag: {
     fontSize: 10,
@@ -209,11 +225,6 @@ const styles: Record<string, React.CSSProperties> = {
   error: {
     fontSize: 11,
     color: '#dc2626',
-  },
-  actions: {
-    display: 'flex',
-    gap: 6,
-    marginTop: 4,
   },
   btnPrimary: {
     fontSize: 11,
