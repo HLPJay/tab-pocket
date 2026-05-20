@@ -24,7 +24,7 @@ export function CollapsibleSection({
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
   const isControlled = expanded !== undefined
   const actualExpanded = isControlled ? expanded : internalExpanded
-  const label = count !== undefined ? `${title} 路 ${count} ${countUnit(title)}` : title
+  const label = count !== undefined ? `${title} · ${count} ${countUnit(title)}` : title
 
   const setActualExpanded = (next: boolean) => {
     if (!isControlled) {
