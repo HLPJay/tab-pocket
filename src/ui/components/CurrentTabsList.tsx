@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { BrowserTab } from '../../domain/browserTabTypes'
+import type { SavedTab } from '../../domain/savedTabTypes'
 import { normalizeUrl } from '../../services/urlNormalizeService'
 import { CurrentTabCard } from './CurrentTabCard'
 
@@ -6,34 +8,73 @@ type Props = {
   tabs: BrowserTab[]
   loading: boolean
   error: string | null
-  capturedNormalizedUrls: Set<string>
-  onCapture: (tab: BrowserTab) => Promise<void>
-  onCaptureAndClose: (tab: BrowserTab) => Promise<void>
+  capturedTabsByNormalizedUrl: Map<string, SavedTab>
+  onActivate: (tab: BrowserTab) => Promise<void>
+  onCapture: (tab: BrowserTab, note: string) => Promise<void>
+  onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
+  onCancelCapture: (id: string) => Promise<void>
+  onCloseTab: (tab: BrowserTab) => Promise<void>
+  onSaveNote: (id: string, note: string) => Promise<void>
+}
+
+function getTabKey(tab: BrowserTab): string {
+  return `${tab.windowId}:${tab.id}:${tab.url}`
 }
 
 export function CurrentTabsList({
   tabs,
   loading,
   error,
-  capturedNormalizedUrls,
+  capturedTabsByNormalizedUrl,
+  onActivate,
   onCapture,
   onCaptureAndClose,
+  onCancelCapture,
+  onCloseTab,
+  onSaveNote,
 }: Props) {
+  const [expandedNoteKey, setExpandedNoteKey] = useState<string | null>(null)
+
   if (loading) return <div style={styles.state}>正在读取标签页…</div>
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
   if (tabs.length === 0) return <div style={styles.state}>当前没有可收纳网页</div>
 
+  // Count how many current tabs share each normalizedUrl
+  const openCountByNormalizedUrl = new Map<string, number>()
+  for (const tab of tabs) {
+    const n = normalizeUrl(tab.url)
+    openCountByNormalizedUrl.set(n, (openCountByNormalizedUrl.get(n) ?? 0) + 1)
+  }
+
   return (
     <div>
-      {tabs.map((tab) => (
-        <CurrentTabCard
-          key={tab.id}
-          tab={tab}
-          isCaptured={capturedNormalizedUrls.has(normalizeUrl(tab.url))}
-          onCapture={onCapture}
-          onCaptureAndClose={onCaptureAndClose}
-        />
-      ))}
+      {tabs.map((tab) => {
+        const key = getTabKey(tab)
+        const n = normalizeUrl(tab.url)
+        const capturedTab = capturedTabsByNormalizedUrl.get(n)
+        const duplicateOpenCount = openCountByNormalizedUrl.get(n) ?? 1
+        return (
+          <CurrentTabCard
+            key={key}
+            tab={tab}
+            capturedTab={capturedTab}
+            duplicateOpenCount={duplicateOpenCount}
+            noteExpanded={expandedNoteKey === key}
+            onToggleNote={() =>
+              setExpandedNoteKey((prev) => (prev === key ? null : key))
+            }
+            onCollapseNote={() =>
+              setExpandedNoteKey((prev) => (prev === key ? null : prev))
+            }
+            onActivate={onActivate}
+            onCapture={onCapture}
+            onCaptureAndClose={onCaptureAndClose}
+            onCancelCapture={onCancelCapture}
+            onCloseTab={onCloseTab}
+            onSaveNote={onSaveNote}
+          />
+        )
+      })}
     </div>
   )
 }

@@ -1,5 +1,7 @@
 export type SavedTabStatus = 'inbox' | 'opened' | 'archived' | 'deleted'
 
+export type SavedTabReviewStatus = 'unprocessed' | 'processing' | 'reviewed'
+
 export type SavedTab = {
   id: string
   url: string
@@ -22,5 +24,7 @@ export type SavedTab = {
   status: SavedTabStatus
 
   note?: string
+  sessionId?: string
   tags: string[]
+  reviewStatus?: SavedTabReviewStatus
 }

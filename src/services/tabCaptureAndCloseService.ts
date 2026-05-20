@@ -1,10 +1,13 @@
 import type { BrowserTab } from '../domain/browserTabTypes'
-import type { SavedTab } from '../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../domain/savedTabTypes'
 import { isCollectibleUrl } from './urlFilterService'
 import { captureBrowserTab } from './tabCaptureService'
 import { closeTab } from '../chrome/chromeTabsClient'
 
-export async function captureBrowserTabAndClose(tab: BrowserTab): Promise<SavedTab> {
+export async function captureBrowserTabAndClose(
+  tab: BrowserTab,
+  options?: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }
+): Promise<SavedTab> {
   if (!isCollectibleUrl(tab.url)) {
     throw new Error(`URL 不可收纳: ${tab.url}`)
   }
@@ -14,7 +17,11 @@ export async function captureBrowserTabAndClose(tab: BrowserTab): Promise<SavedT
   }
 
   // Save first — NEVER close before save succeeds
-  const saved = await captureBrowserTab(tab)
+  const saved = await captureBrowserTab(tab, {
+    note: options?.note,
+    tag: options?.tag,
+    reviewStatus: options?.reviewStatus,
+  })
 
   // Close after save — failure here does NOT roll back the saved data
   await closeTab(tab.id)

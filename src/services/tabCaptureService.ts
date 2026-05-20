@@ -1,5 +1,5 @@
 import type { BrowserTab } from '../domain/browserTabTypes'
-import type { SavedTab } from '../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../domain/savedTabTypes'
 import { isCollectibleUrl, getDomainFromUrl } from './urlFilterService'
 import { normalizeUrl } from './urlNormalizeService'
 import { getStore, saveStore } from '../repositories/storageRepository'
@@ -11,7 +11,15 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
+export async function captureBrowserTab(
+  tab: BrowserTab,
+  options?: {
+    note?: string
+    sessionId?: string
+    tag?: string
+    reviewStatus?: SavedTabReviewStatus
+  }
+): Promise<SavedTab> {
   if (!isCollectibleUrl(tab.url)) {
     throw new Error(`URL 不可收纳: ${tab.url}`)
   }
@@ -19,12 +27,33 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
   const normalized = normalizeUrl(tab.url)
   const store = await getStore()
   const now = Date.now()
+  const trimmedNote = options?.note?.trim() || undefined
+  const sessionId = options?.sessionId
+  const tag = options?.tag
+  const reviewStatus = options?.reviewStatus
+  const newTags = tag !== undefined ? (tag.trim() ? [tag.trim()] : []) : undefined
 
   const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
+  const resolvedSessionId = (() => {
+    if (options?.sessionId !== undefined) return options.sessionId
+    if (!existing) return undefined
+    if (existing.status === 'deleted') return undefined
+    if (!existing.sessionId) return undefined
+    const session = store.sessions[existing.sessionId]
+    if (!session || session.status !== 'active') return undefined
+    return existing.sessionId
+  })()
 
   if (existing) {
     if (existing.status !== 'deleted') {
-      const updated: SavedTab = { ...existing, updatedAt: now }
+      const updated: SavedTab = {
+        ...existing,
+        updatedAt: now,
+        ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+        sessionId: resolvedSessionId,
+        ...(newTags !== undefined ? { tags: newTags } : {}),
+        ...(reviewStatus !== undefined ? { reviewStatus } : {}),
+      }
       store.tabs[existing.id] = updated
       await saveStore(store)
       return updated
@@ -34,6 +63,10 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
       status: 'inbox',
       deletedAt: undefined,
       updatedAt: now,
+      ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+      sessionId: resolvedSessionId,
+      ...(newTags !== undefined ? { tags: newTags } : {}),
+      ...(reviewStatus !== undefined ? { reviewStatus } : {}),
     }
     store.tabs[existing.id] = restored
     await saveStore(store)
@@ -55,7 +88,10 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
     updatedAt: now,
     openCount: 0,
     status: 'inbox',
-    tags: [],
+    tags: newTags ?? [],
+    reviewStatus: reviewStatus ?? 'unprocessed',
+    ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+    ...(resolvedSessionId !== undefined ? { sessionId: resolvedSessionId } : {}),
   }
 
   store.tabs[saved.id] = saved
