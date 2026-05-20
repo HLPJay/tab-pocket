@@ -42,6 +42,7 @@ export function InlineNoteEditor({
   }
 
   const save = async () => {
+    if (busy) return
     setBusy(true)
     setError(null)
     try {
@@ -51,6 +52,19 @@ export function InlineNoteEditor({
       setError(e instanceof Error ? e.message : '保存备注失败')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+      return
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void save()
     }
   }
 
@@ -80,6 +94,7 @@ export function InlineNoteEditor({
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={handleKeyDown}
         style={compact ? styles.compactTextarea : styles.textarea}
         rows={2}
         placeholder="输入备注"

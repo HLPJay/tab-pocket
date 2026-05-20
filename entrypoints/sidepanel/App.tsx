@@ -327,6 +327,9 @@ export function App() {
             tone="current"
           >
             <div style={styles.captureRow}>
+              <span style={styles.captureHint}>
+                本窗口可收纳 {currentTabs.length} 个网页
+              </span>
               <button
                 onClick={() => setShowWindowCapture((v) => !v)}
                 disabled={loadingCurrent}
@@ -478,7 +481,16 @@ const styles: Record<string, React.CSSProperties> = {
     overflowY: 'auto',
   },
   captureRow: {
-    padding: '6px 12px 4px',
+    padding: '8px 12px 6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  captureHint: {
+    fontSize: 12,
+    color: '#6b7280',
   },
   quickBtn: {
     fontSize: 12,

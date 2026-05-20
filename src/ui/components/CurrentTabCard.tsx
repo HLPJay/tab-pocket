@@ -72,6 +72,7 @@ export function CurrentTabCard({
     try {
       await onCaptureAndClose(tab, note)
       setNote('')
+      setShowMoreActions(false)
       onCollapseNote()
     } catch (e) {
       setError(e instanceof Error ? e.message : '关闭失败')
@@ -87,6 +88,7 @@ export function CurrentTabCard({
     try {
       await onCancelCapture(capturedTab.id)
       setNote('')
+      setShowMoreActions(false)
       onCollapseNote()
     } catch (e) {
       setError(e instanceof Error ? e.message : '取消收纳失败')
@@ -100,6 +102,7 @@ export function CurrentTabCard({
     setError(null)
     try {
       await onCloseTab(tab)
+      setShowMoreActions(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : '关闭失败')
     } finally {
@@ -137,8 +140,21 @@ export function CurrentTabCard({
     }
   }
 
-  const handleNoteKeyDown = (e: React.KeyboardEvent) => {
+  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape') {
+      e.preventDefault()
+      onCollapseNote()
+      return
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+
+      if (capturedTab) {
+        void handleSaveNote()
+        return
+      }
+
       onCollapseNote()
     }
   }
