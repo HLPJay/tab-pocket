@@ -10,6 +10,7 @@ type Props = {
   onOpenTab: (id: string) => Promise<void>
   onDeleteTab: (id: string) => Promise<void>
   onDeleteSession: (id: string) => Promise<void>
+  onOpenAll: (sessionId: string) => Promise<void>
 }
 
 export function SessionList({
@@ -20,6 +21,7 @@ export function SessionList({
   onOpenTab,
   onDeleteTab,
   onDeleteSession,
+  onOpenAll,
 }: Props) {
   if (loading) return <div style={styles.state}>正在读取…</div>
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
@@ -35,6 +37,7 @@ export function SessionList({
           onOpenTab={onOpenTab}
           onDeleteTab={onDeleteTab}
           onDeleteSession={onDeleteSession}
+          onOpenAll={onOpenAll}
         />
       ))}
     </div>

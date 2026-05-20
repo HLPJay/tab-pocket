@@ -13,6 +13,8 @@ type Props = {
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
   onCancelCapture: (id: string) => Promise<void>
+  onCloseTab: (tab: BrowserTab) => Promise<void>
+  onSaveNote: (id: string, note: string) => Promise<void>
 }
 
 export function CurrentTabCard({
@@ -25,6 +27,8 @@ export function CurrentTabCard({
   onCapture,
   onCaptureAndClose,
   onCancelCapture,
+  onCloseTab,
+  onSaveNote,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +46,9 @@ export function CurrentTabCard({
       setNote(capturedTab.note ?? '')
     }
   })
+
+  // Track whether a button mousedown is pending (to not collapse on blur before click)
+  const mousedownRef = useRef(false)
 
   const handleCapture = async () => {
     setBusy(true)
@@ -86,6 +93,32 @@ export function CurrentTabCard({
     }
   }
 
+  const handleCloseTab = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onCloseTab(tab)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '关闭失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleSaveNote = async () => {
+    if (!capturedTab) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onSaveNote(capturedTab.id, note)
+      onCollapseNote()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存备注失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleActivate = async () => {
     setActivateError(null)
     try {
@@ -95,9 +128,22 @@ export function CurrentTabCard({
     }
   }
 
+  const handleNoteBlur = () => {
+    // If a button inside this card was just clicked, don't collapse
+    if (mousedownRef.current) return
+    if (!note.trim()) {
+      onCollapseNote()
+    }
+  }
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onCollapseNote()
+    }
+  }
+
   const closeDisabled = tab.pinned
 
-  // Note button label
   const noteButtonLabel = noteExpanded
     ? '收起备注'
     : isCaptured
@@ -107,7 +153,10 @@ export function CurrentTabCard({
         : '添加备注'
 
   return (
-    <div style={styles.card}>
+    <div
+      style={styles.card}
+      onMouseDown={() => { mousedownRef.current = false }}
+    >
       <div style={styles.header}>
         <div
           style={styles.tabInfo}
@@ -149,6 +198,8 @@ export function CurrentTabCard({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          onBlur={handleNoteBlur}
+          onKeyDown={handleNoteKeyDown}
           placeholder="写点备注，方便之后回顾这个网页"
           style={styles.noteInput}
           rows={2}
@@ -158,47 +209,32 @@ export function CurrentTabCard({
 
       {error && <div style={styles.error}>{error}</div>}
 
-      <div style={styles.actions}>
-        {/* Note toggle — always present */}
-        <button
-          onClick={onToggleNote}
-          disabled={busy}
-          style={busy ? styles.btnDisabled : styles.btnNote}
+      <div style={styles.actionsRow}>
+        {/* Left: safe actions */}
+        <div
+          style={styles.actionsLeft}
+          onMouseDown={() => { mousedownRef.current = true }}
+          onMouseUp={() => { mousedownRef.current = false }}
         >
-          {noteButtonLabel}
-        </button>
+          <button
+            onClick={onToggleNote}
+            disabled={busy}
+            style={busy ? styles.btnDisabled : styles.btnNote}
+          >
+            {noteButtonLabel}
+          </button>
 
-        {isCaptured ? (
-          <>
-            {/* Captured state: save note (when expanded) or just the action buttons */}
-            {noteExpanded && (
-              <button
-                onClick={handleCapture}
-                disabled={busy}
-                style={busy ? styles.btnDisabled : styles.btn}
-              >
-                {busy ? '处理中…' : '保存备注'}
-              </button>
-            )}
+          {isCaptured && noteExpanded && (
             <button
-              onClick={handleCancelCapture}
+              onClick={handleSaveNote}
               disabled={busy}
-              style={busy ? styles.btnDisabled : styles.btnDanger}
+              style={busy ? styles.btnDisabled : styles.btn}
             >
-              {busy ? '处理中…' : '取消收纳'}
+              {busy ? '处理中…' : '保存备注'}
             </button>
-            <button
-              onClick={handleCaptureAndClose}
-              disabled={busy || closeDisabled}
-              style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
-              title={closeDisabled ? '固定标签不可关闭' : undefined}
-            >
-              {busy ? '处理中…' : '关闭'}
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Uncaptured state */}
+          )}
+
+          {!isCaptured && (
             <button
               onClick={handleCapture}
               disabled={busy}
@@ -206,6 +242,34 @@ export function CurrentTabCard({
             >
               {busy ? '处理中…' : '收纳'}
             </button>
+          )}
+        </div>
+
+        {/* Right: risk actions */}
+        <div
+          style={styles.actionsRight}
+          onMouseDown={() => { mousedownRef.current = true }}
+          onMouseUp={() => { mousedownRef.current = false }}
+        >
+          {isCaptured ? (
+            <>
+              <button
+                onClick={handleCancelCapture}
+                disabled={busy}
+                style={busy ? styles.btnDisabled : styles.btnDanger}
+              >
+                {busy ? '处理中…' : '取消收纳'}
+              </button>
+              <button
+                onClick={handleCloseTab}
+                disabled={busy || closeDisabled}
+                style={busy || closeDisabled ? styles.btnDisabled : styles.btnDanger}
+                title={closeDisabled ? '固定标签不可关闭' : undefined}
+              >
+                {busy ? '处理中…' : '关闭当前页'}
+              </button>
+            </>
+          ) : (
             <button
               onClick={handleCaptureAndClose}
               disabled={busy || closeDisabled}
@@ -214,8 +278,8 @@ export function CurrentTabCard({
             >
               {busy ? '处理中…' : '收纳并关闭'}
             </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       {closeDisabled && (
@@ -310,10 +374,20 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#9ca3af',
     fontStyle: 'italic',
   },
-  actions: {
+  actionsRow: {
     display: 'flex',
+    justifyContent: 'space-between',
     gap: 6,
     marginTop: 2,
+  },
+  actionsLeft: {
+    display: 'flex',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  actionsRight: {
+    display: 'flex',
+    gap: 6,
     flexWrap: 'wrap',
   },
   btnNote: {

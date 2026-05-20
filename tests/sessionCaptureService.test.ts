@@ -35,9 +35,16 @@ const makeTab = (overrides: Partial<BrowserTab> = {}): BrowserTab => ({
   ...overrides,
 })
 
-const makeInput = (overrides: Partial<BrowserTab> = {}, note?: string): SessionTabInput => ({
+const makeInput = (
+  overrides: Partial<BrowserTab> = {},
+  note?: string,
+  tag?: string,
+  reviewStatus?: SessionTabInput['reviewStatus']
+): SessionTabInput => ({
   tab: makeTab(overrides),
   note,
+  tag,
+  reviewStatus,
 })
 
 let savedIdCounter = 0
@@ -200,5 +207,47 @@ describe('captureBrowserTabsAsSession — per-tab note', () => {
     const calls = vi.mocked(captureBrowserTab).mock.calls
     const sessionId = (calls[0][1] as { sessionId: string }).sessionId
     expect(session.id).toBe(sessionId)
+  })
+})
+
+describe('captureBrowserTabsAsSession — per-tab tag and reviewStatus', () => {
+  it('passes each input tag to captureBrowserTab', async () => {
+    vi.mocked(captureBrowserTab)
+      .mockResolvedValueOnce(makeSavedTab({ id: 'a' }))
+      .mockResolvedValueOnce(makeSavedTab({ id: 'b' }))
+    await captureBrowserTabsAsSession([
+      makeInput({ id: 1, url: 'https://a.com' }, undefined, 'AI工具'),
+      makeInput({ id: 2, url: 'https://b.com' }, undefined, '开发文档'),
+    ])
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ tag: 'AI工具' })
+    )
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ tag: '开发文档' })
+    )
+  })
+
+  it('passes each input reviewStatus to captureBrowserTab', async () => {
+    vi.mocked(captureBrowserTab)
+      .mockResolvedValueOnce(makeSavedTab({ id: 'a' }))
+      .mockResolvedValueOnce(makeSavedTab({ id: 'b' }))
+    await captureBrowserTabsAsSession([
+      makeInput({ id: 1, url: 'https://a.com' }, undefined, undefined, 'reviewed'),
+      makeInput({ id: 2, url: 'https://b.com' }, undefined, undefined, 'processing'),
+    ])
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ reviewStatus: 'reviewed' })
+    )
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ reviewStatus: 'processing' })
+    )
   })
 })

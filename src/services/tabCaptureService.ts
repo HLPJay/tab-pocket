@@ -1,5 +1,5 @@
 import type { BrowserTab } from '../domain/browserTabTypes'
-import type { SavedTab } from '../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../domain/savedTabTypes'
 import { isCollectibleUrl, getDomainFromUrl } from './urlFilterService'
 import { normalizeUrl } from './urlNormalizeService'
 import { getStore, saveStore } from '../repositories/storageRepository'
@@ -13,7 +13,12 @@ function generateId(): string {
 
 export async function captureBrowserTab(
   tab: BrowserTab,
-  options?: { note?: string; sessionId?: string }
+  options?: {
+    note?: string
+    sessionId?: string
+    tag?: string
+    reviewStatus?: SavedTabReviewStatus
+  }
 ): Promise<SavedTab> {
   if (!isCollectibleUrl(tab.url)) {
     throw new Error(`URL 不可收纳: ${tab.url}`)
@@ -24,6 +29,9 @@ export async function captureBrowserTab(
   const now = Date.now()
   const trimmedNote = options?.note?.trim() || undefined
   const sessionId = options?.sessionId
+  const tag = options?.tag
+  const reviewStatus = options?.reviewStatus
+  const newTags = tag !== undefined ? (tag.trim() ? [tag.trim()] : []) : undefined
 
   const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
 
@@ -34,6 +42,8 @@ export async function captureBrowserTab(
         updatedAt: now,
         ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
         ...(sessionId !== undefined ? { sessionId } : {}),
+        ...(newTags !== undefined ? { tags: newTags } : {}),
+        ...(reviewStatus !== undefined ? { reviewStatus } : {}),
       }
       store.tabs[existing.id] = updated
       await saveStore(store)
@@ -46,6 +56,8 @@ export async function captureBrowserTab(
       updatedAt: now,
       ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
       ...(sessionId !== undefined ? { sessionId } : {}),
+      ...(newTags !== undefined ? { tags: newTags } : {}),
+      ...(reviewStatus !== undefined ? { reviewStatus } : {}),
     }
     store.tabs[existing.id] = restored
     await saveStore(store)
@@ -67,7 +79,8 @@ export async function captureBrowserTab(
     updatedAt: now,
     openCount: 0,
     status: 'inbox',
-    tags: [],
+    tags: newTags ?? [],
+    reviewStatus: reviewStatus ?? 'unprocessed',
     ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
     ...(sessionId !== undefined ? { sessionId } : {}),
   }

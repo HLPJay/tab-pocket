@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import type { SavedSession } from '../../domain/sessionTypes'
-import type { SavedTab } from '../../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
+
+const REVIEW_LABEL: Record<SavedTabReviewStatus, string> = {
+  unprocessed: '未处理',
+  processing: '处理中',
+  reviewed: '已回顾',
+}
 
 type Props = {
   session: SavedSession
@@ -8,11 +14,24 @@ type Props = {
   onOpenTab: (id: string) => Promise<void>
   onDeleteTab: (id: string) => Promise<void>
   onDeleteSession: (id: string) => Promise<void>
+  onOpenAll: (sessionId: string) => Promise<void>
 }
 
-export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDeleteSession }: Props) {
+function effectiveReviewStatus(tab: SavedTab): SavedTabReviewStatus {
+  return tab.reviewStatus ?? 'unprocessed'
+}
+
+export function SessionCard({
+  session,
+  tabsById,
+  onOpenTab,
+  onDeleteTab,
+  onDeleteSession,
+  onOpenAll,
+}: Props) {
   const [expanded, setExpanded] = useState(false)
   const [busySession, setBusySession] = useState(false)
+  const [busyOpenAll, setBusyOpenAll] = useState(false)
   const [busyTabId, setBusyTabId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,6 +44,15 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
 
   const capturedDate = new Date(session.capturedAt).toLocaleString()
 
+  const reviewCounts = visibleTabs.reduce(
+    (acc, { tab }) => {
+      const rs = effectiveReviewStatus(tab)
+      acc[rs] = (acc[rs] ?? 0) + 1
+      return acc
+    },
+    {} as Record<SavedTabReviewStatus, number>
+  )
+
   const handleDeleteSession = async () => {
     setBusySession(true)
     setError(null)
@@ -33,6 +61,20 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
     } catch (e) {
       setError(e instanceof Error ? e.message : '删除 Session 失败')
       setBusySession(false)
+    }
+  }
+
+  const handleOpenAll = async () => {
+    const count = visibleTabs.length
+    if (count > 8 && !window.confirm(`即将打开 ${count} 个网页，是否继续？`)) return
+    setBusyOpenAll(true)
+    setError(null)
+    try {
+      await onOpenAll(session.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '打开失败')
+    } finally {
+      setBusyOpenAll(false)
     }
   }
 
@@ -60,6 +102,11 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
     }
   }
 
+  const reviewSummary = (['unprocessed', 'processing', 'reviewed'] as SavedTabReviewStatus[])
+    .filter((rs) => reviewCounts[rs])
+    .map((rs) => `${REVIEW_LABEL[rs]} ${reviewCounts[rs]}`)
+    .join(' · ')
+
   return (
     <div style={styles.card}>
       <div style={styles.header}>
@@ -74,17 +121,29 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
           <div style={styles.name} title={session.name}>{session.name}</div>
           {session.note && <div style={styles.note}>{session.note}</div>}
           <div style={styles.meta}>
-            {session.tabIds.length} 个网页 · {capturedDate}
+            {visibleTabs.length} 个网页
+            {reviewSummary ? ` · ${reviewSummary}` : ''}
+            {' · '}{capturedDate}
           </div>
         </div>
-        <button
-          onClick={handleDeleteSession}
-          disabled={busySession}
-          style={styles.deleteBtnSession}
-          title="删除 Session"
-        >
-          删除
-        </button>
+        <div style={styles.headerActions}>
+          <button
+            onClick={handleOpenAll}
+            disabled={busyOpenAll || busySession || visibleTabs.length === 0}
+            style={busyOpenAll || busySession || visibleTabs.length === 0 ? styles.tabBtnDisabled : styles.tabBtnPrimary}
+            title="打开全部网页"
+          >
+            {busyOpenAll ? '打开中…' : '打开全部'}
+          </button>
+          <button
+            onClick={handleDeleteSession}
+            disabled={busySession || busyOpenAll}
+            style={busySession || busyOpenAll ? styles.tabBtnDisabled : styles.deleteBtnSession}
+            title="删除 Session"
+          >
+            删除
+          </button>
+        </div>
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
@@ -96,11 +155,17 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
           )}
           {visibleTabs.map(({ id, tab }) => {
             const isBusy = busyTabId === id
+            const rs = effectiveReviewStatus(tab)
             return (
               <div key={id} style={styles.tabRow}>
                 <div style={styles.tabInfo}>
                   <div style={styles.tabTitle} title={tab.title}>{tab.title}</div>
-                  <div style={styles.tabDomain}>{tab.domain}</div>
+                  <div style={styles.tabMeta}>
+                    {tab.tags[0] && <span style={styles.tag}>#{tab.tags[0]}</span>}
+                    <span style={styles.reviewBadge}>{REVIEW_LABEL[rs]}</span>
+                    <span style={styles.tabDomain}>{tab.domain}</span>
+                  </div>
+                  {tab.note && <div style={styles.tabNote}>{tab.note}</div>}
                 </div>
                 <div style={styles.tabActions}>
                   <button
@@ -176,6 +241,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: '#9ca3af',
   },
+  headerActions: {
+    flexShrink: 0,
+    display: 'flex',
+    gap: 4,
+    alignItems: 'flex-start',
+  },
   deleteBtnSession: {
     flexShrink: 0,
     fontSize: 11,
@@ -203,7 +274,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabRow: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     padding: '7px 12px 7px 28px',
     borderBottom: '1px solid #f3f4f6',
@@ -213,7 +284,7 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: 1,
+    gap: 2,
   },
   tabTitle: {
     fontSize: 12,
@@ -222,9 +293,31 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  tabMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  tag: {
+    fontSize: 10,
+    color: '#6366f1',
+  },
+  reviewBadge: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
   tabDomain: {
     fontSize: 10,
     color: '#9ca3af',
+  },
+  tabNote: {
+    fontSize: 11,
+    color: '#6b7280',
+    display: '-webkit-box',
+    WebkitLineClamp: 1,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
   },
   tabActions: {
     flexShrink: 0,

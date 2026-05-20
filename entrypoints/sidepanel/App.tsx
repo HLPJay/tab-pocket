@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
 import type { SessionTabInput } from '../../src/services/sessionCaptureService'
 import { activateBrowserTab } from '../../src/services/tabActivateService'
+import { closeCurrentBrowserTab } from '../../src/services/tabCloseService'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
-import type { SavedTab } from '../../src/domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../../src/domain/savedTabTypes'
 import { normalizeUrl } from '../../src/services/urlNormalizeService'
 import { useSavedTabs } from '../../src/ui/hooks/useSavedTabs'
 import { useSavedSessions } from '../../src/ui/hooks/useSavedSessions'
+import { CollapsibleSection } from '../../src/ui/components/CollapsibleSection'
 import { CurrentTabsList } from '../../src/ui/components/CurrentTabsList'
 import { WindowCapturePanel } from '../../src/ui/components/WindowCapturePanel'
 import { InboxList } from '../../src/ui/components/InboxList'
@@ -32,6 +34,7 @@ export function App() {
     restoreTab,
     hardDeleteTab,
     clearTrash,
+    updateTabMeta,
   } = useSavedTabs()
 
   const {
@@ -40,6 +43,8 @@ export function App() {
     sessionError,
     loadSavedSessions,
     captureCurrentWindowAsSession,
+    captureCurrentWindowAsSessionAndClose,
+    openSession,
     deleteSession,
   } = useSavedSessions()
 
@@ -90,6 +95,21 @@ export function App() {
     [captureAndCloseTab, loadCurrentTabs]
   )
 
+  const handleCloseTab = useCallback(
+    async (tab: BrowserTab) => {
+      await closeCurrentBrowserTab(tab)
+      await loadCurrentTabs()
+    },
+    [loadCurrentTabs]
+  )
+
+  const handleSaveNote = useCallback(
+    async (id: string, note: string) => {
+      await updateTabMeta(id, { note })
+    },
+    [updateTabMeta]
+  )
+
   const handleClearTrash = useCallback(async () => {
     await clearTrash()
     await loadSavedSessions()
@@ -104,7 +124,33 @@ export function App() {
     [captureCurrentWindowAsSession, loadSavedTabs]
   )
 
-  // Only show tabs with no sessionId in the ungrouped section
+  const handleWindowCaptureConfirmAndClose = useCallback(
+    async (inputs: SessionTabInput[], name: string): Promise<string | undefined> => {
+      const result = await captureCurrentWindowAsSessionAndClose(inputs, name)
+      await loadSavedTabs()
+      await loadCurrentTabs()
+      if (!result.closeWarning) {
+        setShowWindowCapture(false)
+      }
+      return result.closeWarning
+    },
+    [captureCurrentWindowAsSessionAndClose, loadSavedTabs, loadCurrentTabs]
+  )
+
+  const handleOpenSession = useCallback(
+    async (sessionId: string) => {
+      await openSession(sessionId)
+    },
+    [openSession]
+  )
+
+  const handleUpdateTabMeta = useCallback(
+    async (id: string, patch: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }) => {
+      await updateTabMeta(id, patch)
+    },
+    [updateTabMeta]
+  )
+
   const ungroupedTabs = savedTabs.filter((t) => t.status === 'inbox' && !t.sessionId)
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
   const activeSessions = savedSessions.filter((s) => s.status === 'active')
@@ -125,7 +171,11 @@ export function App() {
       </header>
 
       {/* 当前打开 */}
-      <Section label="当前打开">
+      <CollapsibleSection
+        title="当前打开"
+        count={currentTabs.length}
+        defaultExpanded={true}
+      >
         <div style={styles.captureRow}>
           <button
             onClick={() => setShowWindowCapture(true)}
@@ -139,6 +189,7 @@ export function App() {
           <WindowCapturePanel
             tabs={currentTabs}
             onConfirm={handleWindowCaptureConfirm}
+            onConfirmAndClose={handleWindowCaptureConfirmAndClose}
             onCancel={() => setShowWindowCapture(false)}
           />
         )}
@@ -151,11 +202,17 @@ export function App() {
           onCapture={handleCapture}
           onCaptureAndClose={handleCaptureAndClose}
           onCancelCapture={deleteTab}
+          onCloseTab={handleCloseTab}
+          onSaveNote={handleSaveNote}
         />
-      </Section>
+      </CollapsibleSection>
 
       {/* Sessions */}
-      <Section label="Sessions">
+      <CollapsibleSection
+        title="Sessions"
+        count={activeSessions.length}
+        defaultExpanded={false}
+      >
         <SessionList
           sessions={activeSessions}
           tabsById={tabsById}
@@ -164,21 +221,27 @@ export function App() {
           onOpenTab={openTab}
           onDeleteTab={deleteTab}
           onDeleteSession={deleteSession}
+          onOpenAll={handleOpenSession}
         />
-      </Section>
+      </CollapsibleSection>
 
       {/* 未分组收纳 */}
-      <Section label="未分组收纳">
+      <CollapsibleSection
+        title="未分组收纳"
+        count={ungroupedTabs.length}
+        defaultExpanded={false}
+      >
         <InboxList
           tabs={ungroupedTabs}
           loading={loadingSaved}
           error={savedError}
           onOpen={openTab}
           onDelete={deleteTab}
+          onUpdateMeta={handleUpdateTabMeta}
         />
-      </Section>
+      </CollapsibleSection>
 
-      {/* 回收站 — self-contained with collapse/expand header */}
+      {/* 回收站 */}
       <TrashList
         tabs={trashTabs}
         onRestore={restoreTab}
@@ -186,15 +249,6 @@ export function App() {
         onClearTrash={handleClearTrash}
       />
     </div>
-  )
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div style={styles.sectionLabel}>{label}</div>
-      {children}
-    </section>
   )
 }
 
@@ -226,15 +280,6 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
     padding: '2px 6px',
     borderRadius: 4,
-  },
-  sectionLabel: {
-    padding: '8px 12px 4px',
-    fontSize: 11,
-    fontWeight: 600,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    borderTop: '1px solid #f3f4f6',
   },
   captureRow: {
     padding: '6px 12px 4px',

@@ -3,6 +3,9 @@ import type { SavedSession } from '../../domain/sessionTypes'
 import { listSavedSessions, softDeleteSavedSession } from '../../repositories/storageRepository'
 import { captureBrowserTabsAsSession } from '../../services/sessionCaptureService'
 import type { SessionTabInput } from '../../services/sessionCaptureService'
+import { captureBrowserTabsAsSessionAndClose } from '../../services/sessionCaptureAndCloseService'
+import type { SessionCaptureAndCloseResult } from '../../services/sessionCaptureAndCloseService'
+import { openSessionTabs } from '../../services/sessionOpenService'
 
 export type UseSavedSessionsResult = {
   savedSessions: SavedSession[]
@@ -10,6 +13,8 @@ export type UseSavedSessionsResult = {
   sessionError: string | null
   loadSavedSessions: () => Promise<void>
   captureCurrentWindowAsSession: (inputs: SessionTabInput[], name?: string) => Promise<void>
+  captureCurrentWindowAsSessionAndClose: (inputs: SessionTabInput[], name?: string) => Promise<SessionCaptureAndCloseResult>
+  openSession: (sessionId: string) => Promise<void>
   deleteSession: (id: string) => Promise<void>
 }
 
@@ -38,6 +43,23 @@ export function useSavedSessions(): UseSavedSessionsResult {
     [loadSavedSessions]
   )
 
+  const captureCurrentWindowAsSessionAndClose = useCallback(
+    async (inputs: SessionTabInput[], name?: string): Promise<SessionCaptureAndCloseResult> => {
+      const result = await captureBrowserTabsAsSessionAndClose(inputs, { name })
+      await loadSavedSessions()
+      return result
+    },
+    [loadSavedSessions]
+  )
+
+  const openSession = useCallback(
+    async (sessionId: string) => {
+      await openSessionTabs(sessionId)
+      await loadSavedSessions()
+    },
+    [loadSavedSessions]
+  )
+
   const deleteSession = useCallback(
     async (id: string) => {
       await softDeleteSavedSession(id)
@@ -52,6 +74,8 @@ export function useSavedSessions(): UseSavedSessionsResult {
     sessionError,
     loadSavedSessions,
     captureCurrentWindowAsSession,
+    captureCurrentWindowAsSessionAndClose,
+    openSession,
     deleteSession,
   }
 }

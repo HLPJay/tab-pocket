@@ -13,6 +13,8 @@ type Props = {
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
   onCancelCapture: (id: string) => Promise<void>
+  onCloseTab: (tab: BrowserTab) => Promise<void>
+  onSaveNote: (id: string, note: string) => Promise<void>
 }
 
 function getTabKey(tab: BrowserTab): string {
@@ -28,6 +30,8 @@ export function CurrentTabsList({
   onCapture,
   onCaptureAndClose,
   onCancelCapture,
+  onCloseTab,
+  onSaveNote,
 }: Props) {
   const [expandedNoteKey, setExpandedNoteKey] = useState<string | null>(null)
 
@@ -56,6 +60,8 @@ export function CurrentTabsList({
             onCapture={onCapture}
             onCaptureAndClose={onCaptureAndClose}
             onCancelCapture={onCancelCapture}
+            onCloseTab={onCloseTab}
+            onSaveNote={onSaveNote}
           />
         )
       })}

@@ -1,15 +1,32 @@
 import { useState } from 'react'
-import type { SavedTab } from '../../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
+import { PRESET_TAGS } from '../../services/tagSuggestionService'
 
 type Props = {
   tab: SavedTab
   onOpen: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onUpdateMeta?: (id: string, patch: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }) => Promise<void>
 }
 
-export function SavedTabCard({ tab, onOpen, onDelete }: Props) {
+const REVIEW_LABEL: Record<SavedTabReviewStatus, string> = {
+  unprocessed: '未处理',
+  processing: '处理中',
+  reviewed: '已回顾',
+}
+
+const REVIEW_OPTIONS: Array<{ value: SavedTabReviewStatus; label: string }> = [
+  { value: 'unprocessed', label: '未处理' },
+  { value: 'processing', label: '处理中' },
+  { value: 'reviewed', label: '已回顾' },
+]
+
+export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const effectiveStatus: SavedTabReviewStatus = tab.reviewStatus ?? 'unprocessed'
+  const tagLabel = tab.tags[0] ?? ''
 
   const handleOpen = async () => {
     setBusy(true)
@@ -34,9 +51,58 @@ export function SavedTabCard({ tab, onOpen, onDelete }: Props) {
     }
   }
 
+  const handleReviewStatusChange = async (rs: SavedTabReviewStatus) => {
+    if (!onUpdateMeta) return
+    try {
+      await onUpdateMeta(tab.id, { reviewStatus: rs })
+    } catch {
+      // Silently ignore — not critical
+    }
+  }
+
+  const handleTagChange = async (tag: string) => {
+    if (!onUpdateMeta) return
+    try {
+      await onUpdateMeta(tab.id, { tag })
+    } catch {
+      // Silently ignore — not critical
+    }
+  }
+
   return (
     <div style={styles.card}>
       <div style={styles.title} title={tab.title}>{tab.title}</div>
+      <div style={styles.metaRow}>
+        {onUpdateMeta ? (
+          <select
+            value={tagLabel}
+            onChange={(e) => handleTagChange(e.target.value)}
+            style={styles.tagSelect}
+            disabled={busy}
+          >
+            <option value="">无标签</option>
+            {PRESET_TAGS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        ) : (
+          tagLabel && <span style={styles.tag}>#{tagLabel}</span>
+        )}
+        {onUpdateMeta ? (
+          <select
+            value={effectiveStatus}
+            onChange={(e) => handleReviewStatusChange(e.target.value as SavedTabReviewStatus)}
+            style={styles.statusSelect}
+            disabled={busy}
+          >
+            {REVIEW_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={styles.reviewBadge}>{REVIEW_LABEL[effectiveStatus]}</span>
+        )}
+      </div>
       {tab.note && <div style={styles.note}>{tab.note}</div>}
       <div style={styles.meta}>
         <span style={styles.domain}>{tab.domain}</span>
@@ -73,6 +139,37 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  },
+  metaRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tag: {
+    fontSize: 10,
+    color: '#6366f1',
+  },
+  tagSelect: {
+    fontSize: 10,
+    padding: '1px 3px',
+    borderRadius: 3,
+    border: '1px solid #e5e7eb',
+    background: '#f9fafb',
+    color: '#6366f1',
+    fontFamily: 'inherit',
+  },
+  reviewBadge: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+  statusSelect: {
+    fontSize: 10,
+    padding: '1px 3px',
+    borderRadius: 3,
+    border: '1px solid #e5e7eb',
+    background: '#f9fafb',
+    color: '#6b7280',
+    fontFamily: 'inherit',
   },
   note: {
     fontSize: 11,

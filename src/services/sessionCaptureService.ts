@@ -1,5 +1,6 @@
 import type { BrowserTab } from '../domain/browserTabTypes'
 import type { SavedSession } from '../domain/sessionTypes'
+import type { SavedTabReviewStatus } from '../domain/savedTabTypes'
 import { isCollectibleUrl } from './urlFilterService'
 import { captureBrowserTab } from './tabCaptureService'
 import { upsertSavedSession } from '../repositories/storageRepository'
@@ -7,6 +8,8 @@ import { upsertSavedSession } from '../repositories/storageRepository'
 export type SessionTabInput = {
   tab: BrowserTab
   note?: string
+  tag?: string
+  reviewStatus?: SavedTabReviewStatus
 }
 
 function generateId(): string {
@@ -40,8 +43,8 @@ export async function captureBrowserTabsAsSession(
   const seenIds = new Set<string>()
   const tabIds: string[] = []
 
-  for (const { tab, note } of collectible) {
-    const saved = await captureBrowserTab(tab, { note, sessionId })
+  for (const { tab, note, tag, reviewStatus } of collectible) {
+    const saved = await captureBrowserTab(tab, { note, sessionId, tag, reviewStatus })
     if (!seenIds.has(saved.id)) {
       seenIds.add(saved.id)
       tabIds.push(saved.id)

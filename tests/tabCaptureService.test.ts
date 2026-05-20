@@ -196,3 +196,72 @@ describe('captureBrowserTab — note handling', () => {
     expect(result.note).toBe('原始备注')
   })
 })
+
+describe('captureBrowserTab — tag handling', () => {
+  it('new tab: writes tag when provided', async () => {
+    const saved = await captureBrowserTab(mockTab(), { tag: 'AI工具' })
+    expect(saved.tags).toEqual(['AI工具'])
+  })
+
+  it('new tab: empty tag results in tags = []', async () => {
+    const saved = await captureBrowserTab(mockTab(), { tag: '' })
+    expect(saved.tags).toEqual([])
+  })
+
+  it('new tab: no tag option results in tags = []', async () => {
+    const saved = await captureBrowserTab(mockTab())
+    expect(saved.tags).toEqual([])
+  })
+
+  it('dedup hit: tag provided updates tags', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ tags: ['old'] }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab(), { tag: 'AI工具' })
+    expect(result.tags).toEqual(['AI工具'])
+  })
+
+  it('dedup hit: no tag option preserves existing tags', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ tags: ['old'] }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.tags).toEqual(['old'])
+  })
+})
+
+describe('captureBrowserTab — reviewStatus handling', () => {
+  it('new tab: defaults reviewStatus to unprocessed', async () => {
+    const saved = await captureBrowserTab(mockTab())
+    expect(saved.reviewStatus).toBe('unprocessed')
+  })
+
+  it('new tab: writes provided reviewStatus', async () => {
+    const saved = await captureBrowserTab(mockTab(), { reviewStatus: 'reviewed' })
+    expect(saved.reviewStatus).toBe('reviewed')
+  })
+
+  it('dedup hit: reviewStatus provided updates it', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ reviewStatus: 'unprocessed' }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab(), { reviewStatus: 'processing' })
+    expect(result.reviewStatus).toBe('processing')
+  })
+
+  it('dedup hit: no reviewStatus option preserves existing', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ reviewStatus: 'reviewed' }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab())
+    expect(result.reviewStatus).toBe('reviewed')
+  })
+})
