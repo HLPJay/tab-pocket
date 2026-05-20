@@ -176,18 +176,22 @@ export function SessionCard({
           {visibleTabs.map(({ id, tab }) => {
             const isBusy = busyTabId === id
             const rs = effectiveReviewStatus(tab)
+            const hasNote = Boolean(tab.note?.trim())
+            const primaryText = hasNote ? tab.note!.trim() : tab.title
+            const secondaryText = hasNote ? `${tab.title} · ${tab.domain}` : tab.domain
             return (
               <div key={id} style={styles.tabRow}>
-                <div style={styles.tabInfo}>
-                  <div style={styles.tabTitle} title={tab.title}>
-                    {tab.title}
+                <div style={styles.tabTextBlock}>
+                  <div style={styles.tabPrimary} title={primaryText}>
+                    {primaryText}
                   </div>
-                  <div style={styles.tabMeta}>
+                  <div style={styles.tabSecondary} title={secondaryText}>
+                    {secondaryText}
+                  </div>
+                  <div style={styles.tabMetaLine}>
                     {tab.tags[0] && <span style={styles.tag}>#{tab.tags[0]}</span>}
                     <span style={styles.reviewBadge}>{REVIEW_LABEL[rs]}</span>
-                    <span style={styles.tabDomain}>{tab.domain}</span>
                   </div>
-                  {tab.note && <div style={styles.tabNote}>{tab.note}</div>}
                 </div>
                 <div style={styles.tabActions}>
                   {onUpdateTabMeta && (
@@ -311,21 +315,30 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '7px 12px 7px 28px',
     borderBottom: '1px solid #f3f4f6',
   },
-  tabInfo: {
+  tabTextBlock: {
     flex: 1,
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
   },
-  tabTitle: {
-    fontSize: 12,
-    color: '#374151',
+  tabPrimary: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#111827',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
   },
-  tabMeta: {
+  tabSecondary: {
+    fontSize: 11,
+    color: '#6b7280',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  tabMetaLine: {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
@@ -338,18 +351,6 @@ const styles: Record<string, React.CSSProperties> = {
   reviewBadge: {
     fontSize: 10,
     color: '#9ca3af',
-  },
-  tabDomain: {
-    fontSize: 10,
-    color: '#9ca3af',
-  },
-  tabNote: {
-    fontSize: 11,
-    color: '#6b7280',
-    display: '-webkit-box',
-    WebkitLineClamp: 1,
-    WebkitBoxOrient: 'vertical',
-    overflow: 'hidden',
   },
   tabActions: {
     flexShrink: 0,

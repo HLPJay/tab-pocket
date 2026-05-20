@@ -28,6 +28,9 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
 
   const effectiveStatus: SavedTabReviewStatus = tab.reviewStatus ?? 'unprocessed'
   const tagLabel = tab.tags[0] ?? ''
+  const hasNote = Boolean(tab.note?.trim())
+  const primaryText = hasNote ? tab.note!.trim() : tab.title
+  const secondaryText = hasNote ? `${tab.title} · ${tab.domain}` : tab.domain
 
   const handleOpen = async () => {
     setBusy(true)
@@ -77,7 +80,22 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
 
   return (
     <div style={styles.card}>
-      <div style={styles.title} title={tab.title}>{tab.title}</div>
+      <div style={styles.headerRow}>
+        <div style={styles.textBlock}>
+          <div style={styles.primaryText} title={primaryText}>
+            {primaryText}
+          </div>
+          <div style={styles.secondaryText} title={secondaryText}>
+            {secondaryText}
+          </div>
+        </div>
+
+        <div style={styles.actionsInline}>
+          <button onClick={handleOpen} disabled={busy} style={styles.btnPrimary}>打开</button>
+          <button onClick={handleDelete} disabled={busy} style={styles.btnDanger}>删除</button>
+        </div>
+      </div>
+
       <div style={styles.controlRow}>
         <div style={styles.metaControls}>
           {onUpdateMeta ? (
@@ -118,24 +136,13 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
               hideSummary
             />
           )}
-        </div>
-        <div style={styles.actionsInline}>
-          <button onClick={handleOpen} disabled={busy} style={styles.btnPrimary}>打开</button>
-          <button onClick={handleDelete} disabled={busy} style={styles.btnDanger}>删除</button>
+          <div style={styles.inlineStats}>
+            <span>{new Date(tab.capturedAt).toLocaleString()}</span>
+            {tab.openCount > 0 && <span>已打开 {tab.openCount} 次</span>}
+          </div>
         </div>
       </div>
-      {tab.note && <div style={styles.note}>{tab.note}</div>}
-      <div style={styles.meta}>
-        <span style={styles.domain}>{tab.domain}</span>
-        <span style={styles.dot}>·</span>
-        <span style={styles.time}>{new Date(tab.capturedAt).toLocaleString()}</span>
-        {tab.openCount > 0 && (
-          <>
-            <span style={styles.dot}>·</span>
-            <span>已打开 {tab.openCount} 次</span>
-          </>
-        )}
-      </div>
+
       {error && <div style={styles.error}>{error}</div>}
     </div>
   )
@@ -149,13 +156,41 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 4,
   },
-  title: {
+  headerRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  textBlock: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  primaryText: {
     fontSize: 13,
-    fontWeight: 500,
+    fontWeight: 600,
     color: '#111827',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+  },
+  secondaryText: {
+    fontSize: 11,
+    color: '#6b7280',
+    overflow: 'hidden',
     whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  actionsInline: {
+    display: 'flex',
+    gap: 6,
+    flexShrink: 0,
+    alignItems: 'flex-start',
   },
   controlRow: {
     display: 'flex',
@@ -171,11 +206,14 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     minWidth: 0,
   },
-  actionsInline: {
+  inlineStats: {
     display: 'flex',
+    alignItems: 'center',
     gap: 6,
-    marginLeft: 'auto',
-    flexShrink: 0,
+    fontSize: 11,
+    color: '#9ca3af',
+    flexWrap: 'wrap',
+    marginLeft: 4,
   },
   tag: {
     fontSize: 10,
@@ -203,25 +241,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#6b7280',
     fontFamily: 'inherit',
   },
-  note: {
-    fontSize: 11,
-    color: '#6b7280',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    overflow: 'hidden',
-  },
-  meta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    fontSize: 11,
-    color: '#9ca3af',
-    flexWrap: 'wrap',
-  },
-  domain: { color: '#6b7280' },
-  dot: {},
-  time: {},
   error: {
     fontSize: 11,
     color: '#dc2626',
