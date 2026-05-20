@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SavedSession } from '../../domain/sessionTypes'
 import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
 import { isTabCurrentMemberOfSession } from '../../services/sessionMembershipService'
+import { InlineNoteEditor } from './InlineNoteEditor'
 
 const REVIEW_LABEL: Record<SavedTabReviewStatus, string> = {
   unprocessed: '未处理',
@@ -16,6 +17,10 @@ type Props = {
   onDeleteTab: (id: string) => Promise<void>
   onDeleteSession: (id: string) => Promise<void>
   onOpenAll: (sessionId: string) => Promise<void>
+  onUpdateTabMeta?: (
+    id: string,
+    patch: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }
+  ) => Promise<void>
 }
 
 function effectiveReviewStatus(tab: SavedTab): SavedTabReviewStatus {
@@ -29,6 +34,7 @@ export function SessionCard({
   onDeleteTab,
   onDeleteSession,
   onOpenAll,
+  onUpdateTabMeta,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [busySession, setBusySession] = useState(false)
@@ -103,6 +109,11 @@ export function SessionCard({
     }
   }
 
+  const handleUpdateTabMeta = async (tabId: string, note: string) => {
+    if (!onUpdateTabMeta) return
+    await onUpdateTabMeta(tabId, { note })
+  }
+
   const reviewSummary = (['unprocessed', 'processing', 'reviewed'] as SavedTabReviewStatus[])
     .filter((rs) => reviewCounts[rs])
     .map((rs) => `${REVIEW_LABEL[rs]} ${reviewCounts[rs]}`)
@@ -118,7 +129,11 @@ export function SessionCard({
         >
           {expanded ? '▾' : '▸'}
         </button>
-        <div style={styles.info}>
+        <div
+          style={styles.info}
+          onDoubleClick={() => setExpanded((v) => !v)}
+          title="双击展开 / 收起"
+        >
           <div style={styles.name} title={session.name}>
             {session.name}
           </div>
@@ -130,7 +145,12 @@ export function SessionCard({
             {capturedDate}
           </div>
         </div>
-        <div style={styles.headerActions}>
+        <div
+          style={styles.headerActions}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+          }}
+        >
           <button
             onClick={handleOpenAll}
             disabled={busyOpenAll || busySession || visibleTabs.length === 0}
@@ -171,7 +191,15 @@ export function SessionCard({
                     <span style={styles.reviewBadge}>{REVIEW_LABEL[rs]}</span>
                     <span style={styles.tabDomain}>{tab.domain}</span>
                   </div>
-                  {tab.note && <div style={styles.tabNote}>{tab.note}</div>}
+                  {onUpdateTabMeta ? (
+                    <InlineNoteEditor
+                      note={tab.note}
+                      disabled={isBusy}
+                      onSave={(note) => handleUpdateTabMeta(id, note)}
+                    />
+                  ) : (
+                    tab.note && <div style={styles.tabNote}>{tab.note}</div>
+                  )}
                 </div>
                 <div style={styles.tabActions}>
                   <button
@@ -226,6 +254,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
+    cursor: 'pointer',
   },
   name: {
     fontSize: 13,

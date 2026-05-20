@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
 import { PRESET_TAGS } from '../../services/tagSuggestionService'
+import { InlineNoteEditor } from './InlineNoteEditor'
 
 type Props = {
   tab: SavedTab
@@ -55,8 +56,8 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
     if (!onUpdateMeta) return
     try {
       await onUpdateMeta(tab.id, { reviewStatus: rs })
-    } catch {
-      // Silently ignore — not critical
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存失败')
     }
   }
 
@@ -64,9 +65,14 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
     if (!onUpdateMeta) return
     try {
       await onUpdateMeta(tab.id, { tag })
-    } catch {
-      // Silently ignore — not critical
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存失败')
     }
+  }
+
+  const handleNoteSave = async (note: string) => {
+    if (!onUpdateMeta) return
+    await onUpdateMeta(tab.id, { note })
   }
 
   return (
@@ -103,7 +109,11 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
           <span style={styles.reviewBadge}>{REVIEW_LABEL[effectiveStatus]}</span>
         )}
       </div>
-      {tab.note && <div style={styles.note}>{tab.note}</div>}
+      {onUpdateMeta ? (
+        <InlineNoteEditor note={tab.note} disabled={busy} onSave={handleNoteSave} />
+      ) : (
+        tab.note && <div style={styles.note}>{tab.note}</div>
+      )}
       <div style={styles.meta}>
         <span style={styles.domain}>{tab.domain}</span>
         <span style={styles.dot}>·</span>
@@ -144,6 +154,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
   },
   tag: {
     fontSize: 10,
@@ -185,6 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
     fontSize: 11,
     color: '#9ca3af',
+    flexWrap: 'wrap',
   },
   domain: { color: '#6b7280' },
   dot: {},

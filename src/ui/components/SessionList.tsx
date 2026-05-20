@@ -1,5 +1,5 @@
 import type { SavedSession } from '../../domain/sessionTypes'
-import type { SavedTab } from '../../domain/savedTabTypes'
+import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
 import { SessionCard } from './SessionCard'
 
 type Props = {
@@ -11,6 +11,10 @@ type Props = {
   onDeleteTab: (id: string) => Promise<void>
   onDeleteSession: (id: string) => Promise<void>
   onOpenAll: (sessionId: string) => Promise<void>
+  onUpdateTabMeta?: (
+    id: string,
+    patch: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }
+  ) => Promise<void>
 }
 
 export function SessionList({
@@ -22,6 +26,7 @@ export function SessionList({
   onDeleteTab,
   onDeleteSession,
   onOpenAll,
+  onUpdateTabMeta,
 }: Props) {
   if (loading) return <div style={styles.state}>正在读取…</div>
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
@@ -38,6 +43,7 @@ export function SessionList({
           onDeleteTab={onDeleteTab}
           onDeleteSession={onDeleteSession}
           onOpenAll={onOpenAll}
+          onUpdateTabMeta={onUpdateTabMeta}
         />
       ))}
     </div>

@@ -318,16 +318,17 @@ export function App() {
             }
             tone="sessions"
           >
-            <SessionList
-              sessions={activeSessions}
-              tabsById={tabsById}
-              loading={loadingSessions}
-              error={sessionError}
-              onOpenTab={handleOpenSavedTab}
-              onDeleteTab={deleteTab}
-              onDeleteSession={handleDeleteSession}
-              onOpenAll={handleOpenSession}
-            />
+          <SessionList
+            sessions={activeSessions}
+            tabsById={tabsById}
+            loading={loadingSessions}
+            error={sessionError}
+            onOpenTab={handleOpenSavedTab}
+            onDeleteTab={deleteTab}
+            onDeleteSession={handleDeleteSession}
+            onOpenAll={handleOpenSession}
+            onUpdateTabMeta={handleUpdateTabMeta}
+          />
           </CollapsibleSection>
         </div>
 
