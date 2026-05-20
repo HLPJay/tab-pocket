@@ -243,6 +243,17 @@ export function App() {
     <div style={styles.root}>
       <header style={styles.header}>
         <h1 style={styles.title}>Tab Pocket</h1>
+        <div style={styles.sectionNavWrapper}>
+          <SectionNav
+            items={[
+              { key: 'current', label: '当前打开', count: currentTabs.length, tone: 'current' },
+              { key: 'sessions', label: 'Sessions', count: activeSessions.length, tone: 'sessions' },
+              { key: 'inbox', label: '收纳栏', count: ungroupedTabs.length, tone: 'inbox' },
+              { key: 'trash', label: '回收站', count: trashTabs.length, tone: 'trash' },
+            ]}
+            onSelect={handleSelectSection}
+          />
+        </div>
         <button
           onClick={() => void refresh()}
           disabled={refreshing}
@@ -252,16 +263,6 @@ export function App() {
           {refreshing ? '刷新中…' : '↻'}
         </button>
       </header>
-
-      <SectionNav
-        items={[
-          { key: 'current', label: '当前打开', count: currentTabs.length, tone: 'current' },
-          { key: 'sessions', label: 'Sessions', count: activeSessions.length, tone: 'sessions' },
-          { key: 'inbox', label: '未分组', count: ungroupedTabs.length, tone: 'inbox' },
-          { key: 'trash', label: '回收站', count: trashTabs.length, tone: 'trash' },
-        ]}
-        onSelect={handleSelectSection}
-      />
 
       <main style={styles.main}>
         <div ref={currentSectionRef}>
@@ -334,7 +335,7 @@ export function App() {
 
         <div ref={inboxSectionRef}>
           <CollapsibleSection
-            title="未分组"
+            title="收纳栏"
             count={ungroupedTabs.length}
             defaultExpanded={false}
             expanded={sectionExpanded.inbox}
@@ -384,17 +385,22 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: '12px 16px',
     borderBottom: '1px solid #e5e7eb',
     background: '#fff',
     zIndex: 20,
+    gap: 8,
   },
   title: {
     margin: 0,
     fontSize: 16,
     fontWeight: 600,
     color: '#111827',
+    flexShrink: 0,
+  },
+  sectionNavWrapper: {
+    flex: 1,
+    minWidth: 0,
   },
   refreshBtn: {
     fontSize: 18,

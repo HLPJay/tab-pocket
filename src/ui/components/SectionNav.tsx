@@ -30,19 +30,20 @@ export function SectionNav({ items, onSelect }: SectionNavProps) {
 
 const styles: Record<string, React.CSSProperties> = {
   nav: {
-    flexShrink: 0,
+    flex: 1,
+    minWidth: 0,
     display: 'flex',
     gap: 8,
-    padding: '8px 12px',
-    borderBottom: '1px solid #e5e7eb',
-    background: '#fafafa',
+    padding: 0,
+    background: 'transparent',
     overflowX: 'auto',
     whiteSpace: 'nowrap',
+    alignItems: 'center',
   },
   item: {
     flexShrink: 0,
     fontSize: 11,
-    padding: '5px 10px',
+    padding: '4px 8px',
     borderRadius: 999,
     border: '1px solid transparent',
     cursor: 'pointer',

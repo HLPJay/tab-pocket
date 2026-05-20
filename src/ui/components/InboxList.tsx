@@ -90,7 +90,7 @@ export function InboxList({ tabs, loading, error, onOpen, onDelete, onUpdateMeta
       </div>
       {filtered.length === 0 ? (
         <div style={styles.state}>
-          {tabs.length === 0 ? '暂无未分组收纳的网页' : '没有匹配的网页'}
+          {tabs.length === 0 ? '暂无收纳网页' : '没有匹配的网页'}
         </div>
       ) : (
         filtered.map((tab) => (
