@@ -88,11 +88,11 @@ describe('deleteSessionAndTabs', () => {
     expect(saved.sessions['session-1'].updatedAt).toBeGreaterThan(1)
   })
 
-  it('soft-deletes all tabIds in the session', async () => {
+  it('soft-deletes all tabIds in the session that still belong to it', async () => {
     setStore({
       tabs: {
-        'tab-1': makeTab({ id: 'tab-1' }),
-        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', normalizedUrl: 'https://b.com/' }),
+        'tab-1': makeTab({ id: 'tab-1', sessionId: 'session-1' }),
+        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', normalizedUrl: 'https://b.com/', sessionId: 'session-1' }),
       },
       sessions: { 'session-1': makeSession({ tabIds: ['tab-1', 'tab-2'] }) },
     })
@@ -145,5 +145,53 @@ describe('deleteSessionAndTabs', () => {
     await deleteSessionAndTabs('session-1')
     expect(getStore).toHaveBeenCalledOnce()
     expect(saveStore).toHaveBeenCalledOnce()
+  })
+
+  it('does NOT delete a tab that has been transferred to another session', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ id: 'tab-1', sessionId: 'session-b' }),
+      },
+      sessions: {
+        'session-a': makeSession({ id: 'session-a', tabIds: ['tab-1'] }),
+        'session-b': makeSession({ id: 'session-b', tabIds: ['tab-1'] }),
+      },
+    })
+    await deleteSessionAndTabs('session-a')
+    const saved = vi.mocked(saveStore).mock.calls[0][0]
+    expect(saved.sessions['session-a'].status).toBe('deleted')
+    expect(saved.tabs['tab-1'].status).toBe('inbox')
+    expect(saved.tabs['tab-1'].sessionId).toBe('session-b')
+  })
+
+  it('only deletes tabs still owned by the deleted session', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ id: 'tab-1', sessionId: 'session-a' }),
+        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', normalizedUrl: 'https://b.com/', sessionId: 'session-b' }),
+      },
+      sessions: {
+        'session-a': makeSession({ id: 'session-a', tabIds: ['tab-1', 'tab-2'] }),
+        'session-b': makeSession({ id: 'session-b', tabIds: ['tab-2'] }),
+      },
+    })
+    await deleteSessionAndTabs('session-a')
+    const saved = vi.mocked(saveStore).mock.calls[0][0]
+    expect(saved.tabs['tab-1'].status).toBe('deleted')
+    expect(saved.tabs['tab-2'].status).toBe('inbox')
+  })
+
+  it('does NOT delete a tab with no sessionId listed in a session tabIds', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ id: 'tab-1', sessionId: undefined }),
+      },
+      sessions: {
+        'session-a': makeSession({ id: 'session-a', tabIds: ['tab-1'] }),
+      },
+    })
+    await deleteSessionAndTabs('session-a')
+    const saved = vi.mocked(saveStore).mock.calls[0][0]
+    expect(saved.tabs['tab-1'].status).toBe('inbox')
   })
 })

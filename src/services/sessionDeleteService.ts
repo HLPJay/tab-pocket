@@ -20,6 +20,7 @@ export async function deleteSessionAndTabs(sessionId: string): Promise<void> {
   for (const tabId of session.tabIds) {
     const tab = store.tabs[tabId]
     if (!tab) continue
+    if (tab.sessionId !== sessionId) continue
     store.tabs[tabId] = {
       ...tab,
       status: 'deleted',
