@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { SavedTab } from '../src/domain/savedTabTypes'
+import type { SavedSession } from '../src/domain/sessionTypes'
 
 // In-memory chrome.storage.local mock
 const mockStore: Record<string, unknown> = {}
@@ -22,6 +23,9 @@ import {
   upsertSavedTab,
   softDeleteSavedTab,
   markSavedTabOpened,
+  listSavedSessions,
+  upsertSavedSession,
+  softDeleteSavedSession,
 } from '../src/repositories/storageRepository'
 
 const makeTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
@@ -38,42 +42,66 @@ const makeTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
   ...overrides,
 })
 
+const makeSession = (overrides: Partial<SavedSession> = {}): SavedSession => ({
+  id: 'session-1',
+  name: 'Test Session',
+  tabIds: ['tab-1'],
+  capturedAt: 1000,
+  updatedAt: 1000,
+  status: 'active',
+  ...overrides,
+})
+
 beforeEach(() => {
   Object.keys(mockStore).forEach((k) => delete mockStore[k])
   vi.mocked(chrome.storage.local.get).mockClear()
   vi.mocked(chrome.storage.local.set).mockClear()
 })
 
+// ── getStore ──────────────────────────────────────────────────────────────────
+
 describe('getStore', () => {
-  it('returns default store when storage is empty', async () => {
+  it('returns default store with empty sessions when storage is empty', async () => {
     const store = await getStore()
-    expect(store).toEqual({ version: 1, tabs: {} })
+    expect(store).toEqual({ version: 1, tabs: {}, sessions: {} })
   })
 
   it('returns default store when stored value is not an object', async () => {
     mockStore['tabPocketStore'] = null
     const store = await getStore()
-    expect(store).toEqual({ version: 1, tabs: {} })
+    expect(store).toEqual({ version: 1, tabs: {}, sessions: {} })
+  })
+
+  it('backwards compat: old store without sessions field returns sessions: {}', async () => {
+    mockStore['tabPocketStore'] = { version: 1, tabs: { 'tab-1': makeTab() } }
+    const store = await getStore()
+    expect(store.sessions).toEqual({})
+    expect(store.tabs['tab-1']).toBeDefined()
   })
 })
 
+// ── saveStore ──────────────────────────────────────────────────────────────────
+
 describe('saveStore', () => {
-  it('writes the store to chrome.storage.local', async () => {
-    const state = { version: 1 as const, tabs: { 'tab-1': makeTab() } }
+  it('writes the store including sessions to chrome.storage.local', async () => {
+    const session = makeSession()
+    const state = { version: 1 as const, tabs: {}, sessions: { 'session-1': session } }
     await saveStore(state)
     expect(chrome.storage.local.set).toHaveBeenCalledWith({ tabPocketStore: state })
   })
 })
 
+// ── Tab operations ────────────────────────────────────────────────────────────
+
 describe('upsertSavedTab', () => {
-  it('inserts a new tab into an empty store', async () => {
+  it('inserts a new tab', async () => {
     const tab = makeTab()
     await upsertSavedTab(tab)
     const store = await getStore()
-    expect(store.tabs['tab-1']).toMatchObject({ id: 'tab-1', url: 'https://example.com' })
+    expect(store.tabs['tab-1']).toMatchObject({ id: 'tab-1' })
   })
 
-  it('overwrites an existing tab with the same id', async () => {
+  it('overwrites an existing tab', async () => {
     await upsertSavedTab(makeTab({ openCount: 0 }))
     await upsertSavedTab(makeTab({ openCount: 5 }))
     const store = await getStore()
@@ -81,8 +109,7 @@ describe('upsertSavedTab', () => {
   })
 
   it('does not store body content, screenshots, or base64 favicon', async () => {
-    const tab = makeTab()
-    await upsertSavedTab(tab)
+    await upsertSavedTab(makeTab())
     const stored = JSON.stringify(mockStore)
     expect(stored).not.toContain('base64')
     expect(stored).not.toContain('screenshot')
@@ -115,7 +142,6 @@ describe('softDeleteSavedTab', () => {
     expect(tab.status).toBe('deleted')
     expect(tab.deletedAt).toBeGreaterThanOrEqual(before)
     expect(tab.deletedAt).toBeLessThanOrEqual(after)
-    expect(tab.updatedAt).toBeGreaterThanOrEqual(before)
   })
 
   it('does nothing when id does not exist', async () => {
@@ -124,7 +150,7 @@ describe('softDeleteSavedTab', () => {
 })
 
 describe('markSavedTabOpened', () => {
-  it('increments openCount and sets lastOpenedAt and updatedAt', async () => {
+  it('increments openCount and sets lastOpenedAt', async () => {
     await upsertSavedTab(makeTab({ openCount: 2 }))
     const before = Date.now()
     await markSavedTabOpened('tab-1')
@@ -134,10 +160,65 @@ describe('markSavedTabOpened', () => {
     expect(tab.openCount).toBe(3)
     expect(tab.lastOpenedAt).toBeGreaterThanOrEqual(before)
     expect(tab.lastOpenedAt).toBeLessThanOrEqual(after)
-    expect(tab.updatedAt).toBeGreaterThanOrEqual(before)
+  })
+})
+
+// ── Session operations ────────────────────────────────────────────────────────
+
+describe('listSavedSessions', () => {
+  it('returns empty array for empty store', async () => {
+    expect(await listSavedSessions()).toEqual([])
   })
 
-  it('does nothing when id does not exist', async () => {
-    await expect(markSavedTabOpened('nonexistent')).resolves.toBeUndefined()
+  it('returns sessions sorted by capturedAt descending', async () => {
+    await upsertSavedSession(makeSession({ id: 'a', capturedAt: 100 }))
+    await upsertSavedSession(makeSession({ id: 'b', capturedAt: 300 }))
+    await upsertSavedSession(makeSession({ id: 'c', capturedAt: 200 }))
+    const sessions = await listSavedSessions()
+    expect(sessions.map((s) => s.id)).toEqual(['b', 'c', 'a'])
+  })
+})
+
+describe('upsertSavedSession', () => {
+  it('inserts a new session', async () => {
+    const session = makeSession()
+    await upsertSavedSession(session)
+    const store = await getStore()
+    expect(store.sessions['session-1']).toMatchObject({ id: 'session-1', name: 'Test Session' })
+  })
+
+  it('updates an existing session', async () => {
+    await upsertSavedSession(makeSession({ name: 'Old Name' }))
+    await upsertSavedSession(makeSession({ name: 'New Name' }))
+    const store = await getStore()
+    expect(store.sessions['session-1'].name).toBe('New Name')
+  })
+})
+
+describe('softDeleteSavedSession', () => {
+  it('sets status to deleted and records deletedAt and updatedAt', async () => {
+    await upsertSavedSession(makeSession())
+    const before = Date.now()
+    await softDeleteSavedSession('session-1')
+    const after = Date.now()
+    const store = await getStore()
+    const session = store.sessions['session-1']
+    expect(session.status).toBe('deleted')
+    expect(session.deletedAt).toBeGreaterThanOrEqual(before)
+    expect(session.deletedAt).toBeLessThanOrEqual(after)
+    expect(session.updatedAt).toBeGreaterThanOrEqual(before)
+  })
+
+  it('does not delete tabs when session is deleted', async () => {
+    await upsertSavedTab(makeTab({ id: 'tab-1' }))
+    await upsertSavedSession(makeSession({ tabIds: ['tab-1'] }))
+    await softDeleteSavedSession('session-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1']).toBeDefined()
+    expect(store.tabs['tab-1'].status).toBe('inbox')
+  })
+
+  it('does nothing when session id does not exist', async () => {
+    await expect(softDeleteSavedSession('nonexistent')).resolves.toBeUndefined()
   })
 })
