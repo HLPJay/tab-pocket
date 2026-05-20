@@ -349,9 +349,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: '4px solid transparent',
   },
   activeCard: {
-    background: '#eff6ff',
+    background: '#fff',
     borderLeftColor: '#2563eb',
-    boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.14)',
+    boxShadow: 'inset 0 0 0 1px #bfdbfe',
   },
   titleRow: {
     display: 'flex',

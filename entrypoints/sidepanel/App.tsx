@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
 import type { SessionTabInput } from '../../src/services/sessionCaptureService'
 import { activateBrowserTab } from '../../src/services/tabActivateService'
@@ -308,9 +308,9 @@ export function App() {
           onClick={() => void refresh()}
           disabled={refreshing}
           style={refreshing ? styles.refreshBtnBusy : styles.refreshBtn}
-          title={refreshing ? '刷新中…' : '刷新'}
+          title={refreshing ? '刷新中' : '刷新'}
         >
-          {refreshing ? '刷新中…' : '↻'}
+          {refreshing ? '刷新中' : '↻'}
         </button>
       </header>
 
@@ -328,7 +328,8 @@ export function App() {
           >
             <div style={styles.captureRow}>
               <span style={styles.captureHint}>
-                本窗口可收纳 {currentTabs.length} 个网页
+                <span aria-hidden="true">📦</span>
+                <span>本窗口可收纳 {currentTabs.length} 个网页</span>
               </span>
               <button
                 onClick={() => setShowWindowCapture((v) => !v)}
@@ -481,16 +482,23 @@ const styles: Record<string, React.CSSProperties> = {
     overflowY: 'auto',
   },
   captureRow: {
-    padding: '8px 12px 6px',
+    margin: '8px 12px',
+    padding: '8px 10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
     flexWrap: 'wrap',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#f9fafb',
   },
   captureHint: {
     fontSize: 12,
     color: '#6b7280',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
   },
   quickBtn: {
     fontSize: 12,
