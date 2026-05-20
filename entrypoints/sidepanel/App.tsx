@@ -6,7 +6,6 @@ import { closeCurrentBrowserTab } from '../../src/services/tabCloseService'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
 import type { SavedTab, SavedTabReviewStatus } from '../../src/domain/savedTabTypes'
-import { normalizeUrl } from '../../src/services/urlNormalizeService'
 import { useSavedTabs } from '../../src/ui/hooks/useSavedTabs'
 import { useSavedSessions } from '../../src/ui/hooks/useSavedSessions'
 import { CollapsibleSection } from '../../src/ui/components/CollapsibleSection'
@@ -15,6 +14,11 @@ import { WindowCapturePanel } from '../../src/ui/components/WindowCapturePanel'
 import { InboxList } from '../../src/ui/components/InboxList'
 import { TrashList } from '../../src/ui/components/TrashList'
 import { SessionList } from '../../src/ui/components/SessionList'
+import { normalizeStore } from '../../src/services/storeNormalizeService'
+import {
+  isEffectiveCapturedTab,
+  isUngroupedInboxTab,
+} from '../../src/services/savedTabVisibilityService'
 
 export function App() {
   const [currentTabs, setCurrentTabs] = useState<BrowserTab[]>([])
@@ -68,9 +72,17 @@ export function App() {
   }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
   useEffect(() => {
-    loadCurrentTabs()
-    loadSavedTabs()
-    loadSavedSessions()
+    const init = async () => {
+      try {
+        await normalizeStore()
+      } catch {
+        // normalize failure must not white-screen the app
+      }
+      loadCurrentTabs()
+      loadSavedTabs()
+      loadSavedSessions()
+    }
+    init()
   }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
   const handleActivate = useCallback(
@@ -144,6 +156,15 @@ export function App() {
     [openSession]
   )
 
+  // Delete session and then reload savedTabs so "已收纳" clears immediately
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      await deleteSession(id)
+      await loadSavedTabs()
+    },
+    [deleteSession, loadSavedTabs]
+  )
+
   const handleUpdateTabMeta = useCallback(
     async (id: string, patch: { note?: string; tag?: string; reviewStatus?: SavedTabReviewStatus }) => {
       await updateTabMeta(id, patch)
@@ -151,13 +172,14 @@ export function App() {
     [updateTabMeta]
   )
 
-  const ungroupedTabs = savedTabs.filter((t) => t.status === 'inbox' && !t.sessionId)
-  const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
+  const sessionsById = Object.fromEntries(savedSessions.map((s) => [s.id, s]))
   const activeSessions = savedSessions.filter((s) => s.status === 'active')
+  const ungroupedTabs = savedTabs.filter((t) => isUngroupedInboxTab(t, sessionsById))
+  const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
 
   const capturedTabsByNormalizedUrl = new Map<string, SavedTab>(
     savedTabs
-      .filter((t) => t.status !== 'deleted')
+      .filter((t) => isEffectiveCapturedTab(t, sessionsById))
       .map((t) => [t.normalizedUrl, t])
   )
 
@@ -220,7 +242,7 @@ export function App() {
           error={sessionError}
           onOpenTab={openTab}
           onDeleteTab={deleteTab}
-          onDeleteSession={deleteSession}
+          onDeleteSession={handleDeleteSession}
           onOpenAll={handleOpenSession}
         />
       </CollapsibleSection>

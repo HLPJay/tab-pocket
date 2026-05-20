@@ -29,6 +29,7 @@ import {
   restoreSavedTab,
   hardDeleteSavedTab,
   clearTrash,
+  normalizeOrphanedSessionTabs,
 } from '../src/repositories/storageRepository'
 
 const makeTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
@@ -364,5 +365,62 @@ describe('clearTrash', () => {
     vi.mocked(chrome.storage.local.set).mockClear()
     await clearTrash()
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── normalizeOrphanedSessionTabs ──────────────────────────────────────────────
+
+describe('normalizeOrphanedSessionTabs', () => {
+  it('soft-deletes tab whose sessionId points to a missing session', async () => {
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'ghost-session', status: 'inbox' }))
+    await normalizeOrphanedSessionTabs()
+    const store = await getStore()
+    expect(store.tabs['tab-1'].status).toBe('deleted')
+  })
+
+  it('soft-deletes tab whose sessionId points to a deleted session', async () => {
+    await upsertSavedSession(makeSession({ id: 'session-1', status: 'deleted', deletedAt: 1000 }))
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'session-1', status: 'inbox' }))
+    await normalizeOrphanedSessionTabs()
+    const store = await getStore()
+    expect(store.tabs['tab-1'].status).toBe('deleted')
+  })
+
+  it('preserves tab whose sessionId points to an active session', async () => {
+    await upsertSavedSession(makeSession({ id: 'session-1', status: 'active' }))
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'session-1', status: 'inbox' }))
+    await normalizeOrphanedSessionTabs()
+    const store = await getStore()
+    expect(store.tabs['tab-1'].status).toBe('inbox')
+  })
+
+  it('does not re-process already-deleted tabs', async () => {
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'ghost', status: 'deleted', deletedAt: 999 }))
+    await normalizeOrphanedSessionTabs()
+    const store = await getStore()
+    expect(store.tabs['tab-1'].deletedAt).toBe(999)
+  })
+
+  it('does not call saveStore when no orphans exist', async () => {
+    await upsertSavedSession(makeSession({ id: 'session-1', status: 'active' }))
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'session-1', status: 'inbox' }))
+    vi.mocked(chrome.storage.local.set).mockClear()
+    await normalizeOrphanedSessionTabs()
+    expect(chrome.storage.local.set).not.toHaveBeenCalled()
+  })
+
+  it('calls saveStore exactly once when orphans exist', async () => {
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'ghost', status: 'inbox' }))
+    await upsertSavedTab(makeTab({ id: 'tab-2', sessionId: 'ghost', status: 'inbox', url: 'https://b.com', normalizedUrl: 'https://b.com/' }))
+    vi.mocked(chrome.storage.local.set).mockClear()
+    await normalizeOrphanedSessionTabs()
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not hard-delete any tab', async () => {
+    await upsertSavedTab(makeTab({ id: 'tab-1', sessionId: 'ghost', status: 'inbox' }))
+    await normalizeOrphanedSessionTabs()
+    const store = await getStore()
+    expect(store.tabs['tab-1']).toBeDefined()
   })
 })

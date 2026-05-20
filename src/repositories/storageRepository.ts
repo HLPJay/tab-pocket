@@ -134,3 +134,30 @@ export async function clearTrash(): Promise<void> {
 
   await saveStore(store)
 }
+
+export async function normalizeOrphanedSessionTabs(): Promise<void> {
+  const store = await getStore()
+  const now = Date.now()
+  let changed = false
+
+  for (const id of Object.keys(store.tabs)) {
+    const tab = store.tabs[id]
+    if (tab.status === 'deleted') continue
+    if (!tab.sessionId) continue
+
+    const session = store.sessions[tab.sessionId]
+    if (session && session.status === 'active') continue
+
+    store.tabs[id] = {
+      ...tab,
+      status: 'deleted',
+      deletedAt: now,
+      updatedAt: now,
+    }
+    changed = true
+  }
+
+  if (changed) {
+    await saveStore(store)
+  }
+}

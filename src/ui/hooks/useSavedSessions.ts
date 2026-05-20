@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react'
 import type { SavedSession } from '../../domain/sessionTypes'
-import { listSavedSessions, softDeleteSavedSession } from '../../repositories/storageRepository'
+import { listSavedSessions } from '../../repositories/storageRepository'
 import { captureBrowserTabsAsSession } from '../../services/sessionCaptureService'
 import type { SessionTabInput } from '../../services/sessionCaptureService'
 import { captureBrowserTabsAsSessionAndClose } from '../../services/sessionCaptureAndCloseService'
 import type { SessionCaptureAndCloseResult } from '../../services/sessionCaptureAndCloseService'
 import { openSessionTabs } from '../../services/sessionOpenService'
+import { deleteSessionAndTabs } from '../../services/sessionDeleteService'
 
 export type UseSavedSessionsResult = {
   savedSessions: SavedSession[]
@@ -62,7 +63,7 @@ export function useSavedSessions(): UseSavedSessionsResult {
 
   const deleteSession = useCallback(
     async (id: string) => {
-      await softDeleteSavedSession(id)
+      await deleteSessionAndTabs(id)
       await loadSavedSessions()
     },
     [loadSavedSessions]
