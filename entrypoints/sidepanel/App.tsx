@@ -26,6 +26,12 @@ export function App() {
   const [showWindowCapture, setShowWindowCapture] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const refreshingRef = useRef(false)
+  const [sectionExpanded, setSectionExpanded] = useState<Record<SectionNavKey, boolean>>({
+    current: true,
+    sessions: false,
+    inbox: false,
+    trash: false,
+  })
 
   const currentSectionRef = useRef<HTMLDivElement>(null)
   const sessionsSectionRef = useRef<HTMLDivElement>(null)
@@ -101,6 +107,7 @@ export function App() {
         await loadAllData()
       }
     }
+
     void init()
 
     return () => {
@@ -219,9 +226,16 @@ export function App() {
   }
 
   const handleSelectSection = useCallback((key: SectionNavKey) => {
-    sectionRefs[key].current?.scrollIntoView({
-      block: 'start',
-      behavior: 'smooth',
+    setSectionExpanded((prev) => ({
+      ...prev,
+      [key]: true,
+    }))
+
+    requestAnimationFrame(() => {
+      sectionRefs[key].current?.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      })
     })
   }, [])
 
@@ -251,7 +265,16 @@ export function App() {
 
       <main style={styles.main}>
         <div ref={currentSectionRef}>
-          <CollapsibleSection title="当前打开" count={currentTabs.length} defaultExpanded tone="current">
+          <CollapsibleSection
+            title="当前打开"
+            count={currentTabs.length}
+            defaultExpanded
+            expanded={sectionExpanded.current}
+            onExpandedChange={(expanded) =>
+              setSectionExpanded((prev) => ({ ...prev, current: expanded }))
+            }
+            tone="current"
+          >
             <div style={styles.captureRow}>
               <button
                 onClick={() => setShowWindowCapture((v) => !v)}
@@ -285,7 +308,16 @@ export function App() {
         </div>
 
         <div ref={sessionsSectionRef}>
-          <CollapsibleSection title="Sessions" count={activeSessions.length} defaultExpanded={false} tone="sessions">
+          <CollapsibleSection
+            title="Sessions"
+            count={activeSessions.length}
+            defaultExpanded={false}
+            expanded={sectionExpanded.sessions}
+            onExpandedChange={(expanded) =>
+              setSectionExpanded((prev) => ({ ...prev, sessions: expanded }))
+            }
+            tone="sessions"
+          >
             <SessionList
               sessions={activeSessions}
               tabsById={tabsById}
@@ -300,7 +332,16 @@ export function App() {
         </div>
 
         <div ref={inboxSectionRef}>
-          <CollapsibleSection title="未分组" count={ungroupedTabs.length} defaultExpanded={false} tone="inbox">
+          <CollapsibleSection
+            title="未分组"
+            count={ungroupedTabs.length}
+            defaultExpanded={false}
+            expanded={sectionExpanded.inbox}
+            onExpandedChange={(expanded) =>
+              setSectionExpanded((prev) => ({ ...prev, inbox: expanded }))
+            }
+            tone="inbox"
+          >
             <InboxList
               tabs={ungroupedTabs}
               loading={loadingSaved}
@@ -315,6 +356,10 @@ export function App() {
         <div ref={trashSectionRef}>
           <TrashList
             tabs={trashTabs}
+            expanded={sectionExpanded.trash}
+            onExpandedChange={(expanded) =>
+              setSectionExpanded((prev) => ({ ...prev, trash: expanded }))
+            }
             onRestore={restoreTab}
             onHardDelete={hardDeleteTab}
             onClearTrash={handleClearTrash}

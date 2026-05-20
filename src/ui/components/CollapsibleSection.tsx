@@ -4,6 +4,8 @@ type Props = {
   title: string
   count?: number
   defaultExpanded?: boolean
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
   tone?: 'current' | 'sessions' | 'inbox' | 'trash'
   rightActions?: React.ReactNode
   children: React.ReactNode
@@ -13,14 +15,25 @@ export function CollapsibleSection({
   title,
   count,
   defaultExpanded = true,
+  expanded,
+  onExpandedChange,
   tone = 'current',
   rightActions,
   children,
 }: Props) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
-  const label = count !== undefined ? `${title} · ${count} ${countUnit(title)}` : title
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded)
+  const isControlled = expanded !== undefined
+  const actualExpanded = isControlled ? expanded : internalExpanded
+  const label = count !== undefined ? `${title} 路 ${count} ${countUnit(title)}` : title
 
-  const toggle = () => setExpanded((v) => !v)
+  const setActualExpanded = (next: boolean) => {
+    if (!isControlled) {
+      setInternalExpanded(next)
+    }
+    onExpandedChange?.(next)
+  }
+
+  const toggle = () => setActualExpanded(!actualExpanded)
 
   return (
     <section>
@@ -51,11 +64,11 @@ export function CollapsibleSection({
             }}
             style={styles.toggleBtn}
           >
-            {expanded ? '收起' : '展开'}
+            {actualExpanded ? '收起' : '展开'}
           </button>
         </div>
       </div>
-      {expanded && <div>{children}</div>}
+      {actualExpanded && <div>{children}</div>}
     </section>
   )
 }

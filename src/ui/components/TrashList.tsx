@@ -7,9 +7,18 @@ type Props = {
   onRestore: (id: string) => Promise<void>
   onHardDelete: (id: string) => Promise<void>
   onClearTrash: () => Promise<void>
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
 }
 
-export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props) {
+export function TrashList({
+  tabs,
+  onRestore,
+  onHardDelete,
+  onClearTrash,
+  expanded,
+  onExpandedChange,
+}: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +67,8 @@ export function TrashList({ tabs, onRestore, onHardDelete, onClearTrash }: Props
       title="回收站"
       count={count}
       defaultExpanded={false}
+      expanded={expanded}
+      onExpandedChange={onExpandedChange}
       tone="trash"
       rightActions={
         count > 0 ? (
