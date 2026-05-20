@@ -1,24 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
-import type { SavedTab } from '../../src/domain/savedTabTypes'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
 import { normalizeUrl } from '../../src/services/urlNormalizeService'
-import { listSavedTabs } from '../../src/repositories/storageRepository'
-import { captureBrowserTab } from '../../src/services/tabCaptureService'
-import { openSavedTab } from '../../src/services/tabOpenService'
-import { deleteSavedTab } from '../../src/services/tabDeleteService'
+import { useSavedTabs } from '../../src/ui/hooks/useSavedTabs'
 import { CurrentTabsList } from '../../src/ui/components/CurrentTabsList'
 import { InboxList } from '../../src/ui/components/InboxList'
 import { TrashList } from '../../src/ui/components/TrashList'
 
 export function App() {
   const [currentTabs, setCurrentTabs] = useState<BrowserTab[]>([])
-  const [savedTabs, setSavedTabs] = useState<SavedTab[]>([])
   const [loadingCurrent, setLoadingCurrent] = useState(true)
-  const [loadingSaved, setLoadingSaved] = useState(true)
   const [currentError, setCurrentError] = useState<string | null>(null)
-  const [savedError, setSavedError] = useState<string | null>(null)
+
+  const { savedTabs, loadingSaved, savedError, loadSavedTabs, captureTab, openTab, deleteTab } =
+    useSavedTabs()
 
   const loadCurrentTabs = useCallback(async () => {
     setLoadingCurrent(true)
@@ -30,18 +26,6 @@ export function App() {
       setCurrentError(e instanceof Error ? e.message : '读取标签页失败，请重试。')
     } finally {
       setLoadingCurrent(false)
-    }
-  }, [])
-
-  const loadSavedTabs = useCallback(async () => {
-    setLoadingSaved(true)
-    setSavedError(null)
-    try {
-      setSavedTabs(await listSavedTabs())
-    } catch (e) {
-      setSavedError(e instanceof Error ? e.message : '读取收纳数据失败。')
-    } finally {
-      setLoadingSaved(false)
     }
   }, [])
 
@@ -62,21 +46,6 @@ export function App() {
     savedTabs.filter((t) => t.status !== 'deleted').map((t) => t.normalizedUrl)
   )
 
-  const handleCapture = async (tab: BrowserTab) => {
-    await captureBrowserTab(tab)
-    await loadSavedTabs()
-  }
-
-  const handleOpen = async (id: string) => {
-    await openSavedTab(id)
-    await loadSavedTabs()
-  }
-
-  const handleDelete = async (id: string) => {
-    await deleteSavedTab(id)
-    await loadSavedTabs()
-  }
-
   return (
     <div style={styles.root}>
       <header style={styles.header}>
@@ -90,7 +59,7 @@ export function App() {
           loading={loadingCurrent}
           error={currentError}
           capturedNormalizedUrls={capturedNormalizedUrls}
-          onCapture={handleCapture}
+          onCapture={captureTab}
         />
       </Section>
 
@@ -99,8 +68,8 @@ export function App() {
           tabs={inboxTabs}
           loading={loadingSaved}
           error={savedError}
-          onOpen={handleOpen}
-          onDelete={handleDelete}
+          onOpen={openTab}
+          onDelete={deleteTab}
         />
       </Section>
 
