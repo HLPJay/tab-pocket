@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { BrowserTab } from '../../domain/browserTabTypes'
+import type { SavedTab } from '../../domain/savedTabTypes'
 import { normalizeUrl } from '../../services/urlNormalizeService'
 import { CurrentTabCard } from './CurrentTabCard'
 
@@ -7,9 +8,10 @@ type Props = {
   tabs: BrowserTab[]
   loading: boolean
   error: string | null
-  capturedNormalizedUrls: Set<string>
+  capturedTabsByNormalizedUrl: Map<string, SavedTab>
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
+  onCancelCapture: (id: string) => Promise<void>
 }
 
 function getTabKey(tab: BrowserTab): string {
@@ -20,9 +22,10 @@ export function CurrentTabsList({
   tabs,
   loading,
   error,
-  capturedNormalizedUrls,
+  capturedTabsByNormalizedUrl,
   onCapture,
   onCaptureAndClose,
+  onCancelCapture,
 }: Props) {
   const [expandedNoteKey, setExpandedNoteKey] = useState<string | null>(null)
 
@@ -34,11 +37,12 @@ export function CurrentTabsList({
     <div>
       {tabs.map((tab) => {
         const key = getTabKey(tab)
+        const capturedTab = capturedTabsByNormalizedUrl.get(normalizeUrl(tab.url))
         return (
           <CurrentTabCard
             key={key}
             tab={tab}
-            isCaptured={capturedNormalizedUrls.has(normalizeUrl(tab.url))}
+            capturedTab={capturedTab}
             noteExpanded={expandedNoteKey === key}
             onToggleNote={() =>
               setExpandedNoteKey((prev) => (prev === key ? null : key))
@@ -48,6 +52,7 @@ export function CurrentTabsList({
             }
             onCapture={onCapture}
             onCaptureAndClose={onCaptureAndClose}
+            onCancelCapture={onCancelCapture}
           />
         )
       })}

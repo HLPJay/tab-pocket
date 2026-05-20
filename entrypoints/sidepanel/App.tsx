@@ -3,6 +3,7 @@ import type { BrowserTab } from '../../src/domain/browserTabTypes'
 import type { SessionTabInput } from '../../src/services/sessionCaptureService'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
+import type { SavedTab } from '../../src/domain/savedTabTypes'
 import { normalizeUrl } from '../../src/services/urlNormalizeService'
 import { useSavedTabs } from '../../src/ui/hooks/useSavedTabs'
 import { useSavedSessions } from '../../src/ui/hooks/useSavedSessions'
@@ -100,8 +101,10 @@ export function App() {
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
   const activeSessions = savedSessions.filter((s) => s.status === 'active')
 
-  const capturedNormalizedUrls = new Set(
-    savedTabs.filter((t) => t.status !== 'deleted').map((t) => t.normalizedUrl)
+  const capturedTabsByNormalizedUrl = new Map<string, SavedTab>(
+    savedTabs
+      .filter((t) => t.status !== 'deleted')
+      .map((t) => [t.normalizedUrl, t])
   )
 
   const tabsById = Object.fromEntries(savedTabs.map((t) => [t.id, t]))
@@ -135,9 +138,10 @@ export function App() {
           tabs={currentTabs}
           loading={loadingCurrent}
           error={currentError}
-          capturedNormalizedUrls={capturedNormalizedUrls}
+          capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
           onCapture={handleCapture}
           onCaptureAndClose={handleCaptureAndClose}
+          onCancelCapture={deleteTab}
         />
       </Section>
 

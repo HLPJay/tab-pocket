@@ -1,30 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { BrowserTab } from '../../domain/browserTabTypes'
+import type { SavedTab } from '../../domain/savedTabTypes'
 import { getDomainFromUrl } from '../../services/urlFilterService'
 
 type Props = {
   tab: BrowserTab
-  isCaptured: boolean
+  capturedTab?: SavedTab
   noteExpanded: boolean
   onToggleNote: () => void
   onCollapseNote: () => void
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
+  onCancelCapture: (id: string) => Promise<void>
 }
 
 export function CurrentTabCard({
   tab,
-  isCaptured,
+  capturedTab,
   noteExpanded,
   onToggleNote,
   onCollapseNote,
   onCapture,
   onCaptureAndClose,
+  onCancelCapture,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const domain = getDomainFromUrl(tab.url)
+  const isCaptured = capturedTab !== undefined
+
+  // Pre-fill note from capturedTab when expanding in captured state
+  const prevExpandedRef = useRef(noteExpanded)
+  useEffect(() => {
+    const wasExpanded = prevExpandedRef.current
+    prevExpandedRef.current = noteExpanded
+    if (noteExpanded && !wasExpanded && capturedTab && !note) {
+      setNote(capturedTab.note ?? '')
+    }
+  })
 
   const handleCapture = async () => {
     setBusy(true)
@@ -48,14 +62,37 @@ export function CurrentTabCard({
       setNote('')
       onCollapseNote()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '收纳并关闭失败')
+      setError(e instanceof Error ? e.message : '关闭失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleCancelCapture = async () => {
+    if (!capturedTab) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onCancelCapture(capturedTab.id)
+      setNote('')
+      onCollapseNote()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '取消收纳失败')
     } finally {
       setBusy(false)
     }
   }
 
   const closeDisabled = tab.pinned
-  const noteButtonLabel = noteExpanded ? '收起备注' : note ? '编辑备注' : '添加备注'
+
+  // Note button label
+  const noteButtonLabel = noteExpanded
+    ? '收起备注'
+    : isCaptured
+      ? '编辑备注'
+      : note
+        ? '编辑备注'
+        : '添加备注'
 
   return (
     <div style={styles.card}>
@@ -76,6 +113,7 @@ export function CurrentTabCard({
         {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
       <div style={styles.domain} title={tab.url}>{domain}</div>
+
       {noteExpanded && (
         <textarea
           value={note}
@@ -86,8 +124,11 @@ export function CurrentTabCard({
           autoFocus
         />
       )}
+
       {error && <div style={styles.error}>{error}</div>}
+
       <div style={styles.actions}>
+        {/* Note toggle — always present */}
         <button
           onClick={onToggleNote}
           disabled={busy}
@@ -95,22 +136,57 @@ export function CurrentTabCard({
         >
           {noteButtonLabel}
         </button>
-        <button
-          onClick={handleCapture}
-          disabled={busy}
-          style={busy ? styles.btnDisabled : styles.btn}
-        >
-          {busy ? '处理中…' : '收纳'}
-        </button>
-        <button
-          onClick={handleCaptureAndClose}
-          disabled={busy || closeDisabled}
-          style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
-          title={closeDisabled ? '固定标签不可关闭' : undefined}
-        >
-          {busy ? '处理中…' : '收纳并关闭'}
-        </button>
+
+        {isCaptured ? (
+          <>
+            {/* Captured state: save note (when expanded) or just the action buttons */}
+            {noteExpanded && (
+              <button
+                onClick={handleCapture}
+                disabled={busy}
+                style={busy ? styles.btnDisabled : styles.btn}
+              >
+                {busy ? '处理中…' : '保存备注'}
+              </button>
+            )}
+            <button
+              onClick={handleCancelCapture}
+              disabled={busy}
+              style={busy ? styles.btnDisabled : styles.btnDanger}
+            >
+              {busy ? '处理中…' : '取消收纳'}
+            </button>
+            <button
+              onClick={handleCaptureAndClose}
+              disabled={busy || closeDisabled}
+              style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
+              title={closeDisabled ? '固定标签不可关闭' : undefined}
+            >
+              {busy ? '处理中…' : '关闭'}
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Uncaptured state */}
+            <button
+              onClick={handleCapture}
+              disabled={busy}
+              style={busy ? styles.btnDisabled : styles.btn}
+            >
+              {busy ? '处理中…' : '收纳'}
+            </button>
+            <button
+              onClick={handleCaptureAndClose}
+              disabled={busy || closeDisabled}
+              style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
+              title={closeDisabled ? '固定标签不可关闭' : undefined}
+            >
+              {busy ? '处理中…' : '收纳并关闭'}
+            </button>
+          </>
+        )}
       </div>
+
       {closeDisabled && (
         <div style={styles.hint}>固定标签不可关闭</div>
       )}
@@ -212,6 +288,15 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid #6366f1',
     background: '#eef2ff',
     color: '#4338ca',
+    cursor: 'pointer',
+  },
+  btnDanger: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #fca5a5',
+    background: '#fff5f5',
+    color: '#dc2626',
     cursor: 'pointer',
   },
   btnDisabled: {
