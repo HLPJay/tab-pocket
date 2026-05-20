@@ -8,6 +8,7 @@ type Props = {
   error: string | null
   capturedNormalizedUrls: Set<string>
   onCapture: (tab: BrowserTab) => Promise<void>
+  onCaptureAndClose: (tab: BrowserTab) => Promise<void>
 }
 
 export function CurrentTabsList({
@@ -16,6 +17,7 @@ export function CurrentTabsList({
   error,
   capturedNormalizedUrls,
   onCapture,
+  onCaptureAndClose,
 }: Props) {
   if (loading) return <div style={styles.state}>正在读取标签页…</div>
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
@@ -29,6 +31,7 @@ export function CurrentTabsList({
           tab={tab}
           isCaptured={capturedNormalizedUrls.has(normalizeUrl(tab.url))}
           onCapture={onCapture}
+          onCaptureAndClose={onCaptureAndClose}
         />
       ))}
     </div>

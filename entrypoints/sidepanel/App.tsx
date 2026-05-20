@@ -13,8 +13,16 @@ export function App() {
   const [loadingCurrent, setLoadingCurrent] = useState(true)
   const [currentError, setCurrentError] = useState<string | null>(null)
 
-  const { savedTabs, loadingSaved, savedError, loadSavedTabs, captureTab, openTab, deleteTab } =
-    useSavedTabs()
+  const {
+    savedTabs,
+    loadingSaved,
+    savedError,
+    loadSavedTabs,
+    captureTab,
+    captureAndCloseTab,
+    openTab,
+    deleteTab,
+  } = useSavedTabs()
 
   const loadCurrentTabs = useCallback(async () => {
     setLoadingCurrent(true)
@@ -39,6 +47,15 @@ export function App() {
     loadSavedTabs()
   }, [loadCurrentTabs, loadSavedTabs])
 
+  // After capture-and-close succeeds the tab is gone — refresh current list too
+  const handleCaptureAndClose = useCallback(
+    async (tab: BrowserTab) => {
+      await captureAndCloseTab(tab)
+      await loadCurrentTabs()
+    },
+    [captureAndCloseTab, loadCurrentTabs]
+  )
+
   const inboxTabs = savedTabs.filter((t) => t.status === 'inbox')
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
 
@@ -60,6 +77,7 @@ export function App() {
           error={currentError}
           capturedNormalizedUrls={capturedNormalizedUrls}
           onCapture={captureTab}
+          onCaptureAndClose={handleCaptureAndClose}
         />
       </Section>
 

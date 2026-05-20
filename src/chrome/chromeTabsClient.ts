@@ -4,6 +4,10 @@ export async function createTab(url: string): Promise<chrome.tabs.Tab> {
   return chrome.tabs.create({ url })
 }
 
+export async function closeTab(tabId: number): Promise<void> {
+  await chrome.tabs.remove(tabId)
+}
+
 export async function getCurrentWindowTabs(): Promise<BrowserTab[]> {
   const tabs = await chrome.tabs.query({ currentWindow: true })
 

@@ -6,9 +6,10 @@ type Props = {
   tab: BrowserTab
   isCaptured: boolean
   onCapture: (tab: BrowserTab) => Promise<void>
+  onCaptureAndClose: (tab: BrowserTab) => Promise<void>
 }
 
-export function CurrentTabCard({ tab, isCaptured, onCapture }: Props) {
+export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const domain = getDomainFromUrl(tab.url)
@@ -24,6 +25,20 @@ export function CurrentTabCard({ tab, isCaptured, onCapture }: Props) {
       setBusy(false)
     }
   }
+
+  const handleCaptureAndClose = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onCaptureAndClose(tab)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '收纳并关闭失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const closeDisabled = tab.pinned
 
   return (
     <div style={styles.card}>
@@ -49,12 +64,22 @@ export function CurrentTabCard({ tab, isCaptured, onCapture }: Props) {
         <button
           onClick={handleCapture}
           disabled={busy || isCaptured}
-          style={isCaptured ? styles.btnDisabled : styles.btn}
+          style={busy || isCaptured ? styles.btnDisabled : styles.btn}
         >
-          {busy ? '收纳中…' : '收纳'}
+          {busy ? '处理中…' : '收纳'}
         </button>
-        <button disabled style={styles.btnDisabled}>收纳并关闭</button>
+        <button
+          onClick={handleCaptureAndClose}
+          disabled={busy || closeDisabled}
+          style={busy || closeDisabled ? styles.btnDisabled : styles.btn}
+          title={closeDisabled ? '固定标签不可关闭' : undefined}
+        >
+          {busy ? '处理中…' : '收纳并关闭'}
+        </button>
       </div>
+      {closeDisabled && (
+        <div style={styles.hint}>固定标签不可关闭</div>
+      )}
     </div>
   )
 }
@@ -112,6 +137,11 @@ const styles: Record<string, React.CSSProperties> = {
   error: {
     fontSize: 11,
     color: '#dc2626',
+  },
+  hint: {
+    fontSize: 10,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   actions: {
     display: 'flex',
