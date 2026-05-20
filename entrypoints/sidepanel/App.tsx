@@ -25,6 +25,7 @@ export function App() {
   const [currentError, setCurrentError] = useState<string | null>(null)
   const [showWindowCapture, setShowWindowCapture] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const refreshingRef = useRef(false)
 
   const currentSectionRef = useRef<HTMLDivElement>(null)
   const sessionsSectionRef = useRef<HTMLDivElement>(null)
@@ -70,28 +71,42 @@ export function App() {
     }
   }, [])
 
-  const refresh = useCallback(async () => {
-    if (refreshing) return
+  const loadAllData = useCallback(async () => {
+    await Promise.all([loadCurrentTabs(), loadSavedTabs(), loadSavedSessions()])
+  }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
+  const refresh = useCallback(async () => {
+    if (refreshingRef.current) return
+
+    refreshingRef.current = true
     setRefreshing(true)
     try {
-      await Promise.all([loadCurrentTabs(), loadSavedTabs(), loadSavedSessions()])
+      await loadAllData()
     } finally {
+      refreshingRef.current = false
       setRefreshing(false)
     }
-  }, [refreshing, loadCurrentTabs, loadSavedTabs, loadSavedSessions])
+  }, [loadAllData])
 
   useEffect(() => {
+    let cancelled = false
+
     const init = async () => {
       try {
         await normalizeStore()
       } catch {
         // normalize failure must not white-screen the app
       }
-      await refresh()
+      if (!cancelled) {
+        await loadAllData()
+      }
     }
     void init()
-  }, [refresh])
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadAllData])
 
   const handleActivate = useCallback(
     async (tab: BrowserTab) => {
@@ -99,6 +114,14 @@ export function App() {
       await loadCurrentTabs()
     },
     [loadCurrentTabs]
+  )
+
+  const handleOpenSavedTab = useCallback(
+    async (id: string) => {
+      await openTab(id)
+      await loadCurrentTabs()
+    },
+    [openTab, loadCurrentTabs]
   )
 
   const handleCapture = useCallback(
@@ -161,8 +184,9 @@ export function App() {
   const handleOpenSession = useCallback(
     async (sessionId: string) => {
       await openSession(sessionId)
+      await loadCurrentTabs()
     },
-    [openSession]
+    [openSession, loadCurrentTabs]
   )
 
   const handleDeleteSession = useCallback(
@@ -267,7 +291,7 @@ export function App() {
               tabsById={tabsById}
               loading={loadingSessions}
               error={sessionError}
-              onOpenTab={openTab}
+              onOpenTab={handleOpenSavedTab}
               onDeleteTab={deleteTab}
               onDeleteSession={handleDeleteSession}
               onOpenAll={handleOpenSession}
@@ -281,7 +305,7 @@ export function App() {
               tabs={ungroupedTabs}
               loading={loadingSaved}
               error={savedError}
-              onOpen={openTab}
+              onOpen={handleOpenSavedTab}
               onDelete={deleteTab}
               onUpdateMeta={handleUpdateTabMeta}
             />
