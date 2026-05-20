@@ -11,7 +11,10 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
+export async function captureBrowserTab(
+  tab: BrowserTab,
+  options?: { note?: string }
+): Promise<SavedTab> {
   if (!isCollectibleUrl(tab.url)) {
     throw new Error(`URL 不可收纳: ${tab.url}`)
   }
@@ -19,12 +22,17 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
   const normalized = normalizeUrl(tab.url)
   const store = await getStore()
   const now = Date.now()
+  const trimmedNote = options?.note?.trim() || undefined
 
   const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
 
   if (existing) {
     if (existing.status !== 'deleted') {
-      const updated: SavedTab = { ...existing, updatedAt: now }
+      const updated: SavedTab = {
+        ...existing,
+        updatedAt: now,
+        ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+      }
       store.tabs[existing.id] = updated
       await saveStore(store)
       return updated
@@ -34,6 +42,7 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
       status: 'inbox',
       deletedAt: undefined,
       updatedAt: now,
+      ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
     }
     store.tabs[existing.id] = restored
     await saveStore(store)
@@ -56,6 +65,7 @@ export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
     openCount: 0,
     status: 'inbox',
     tags: [],
+    ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
   }
 
   store.tabs[saved.id] = saved

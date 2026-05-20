@@ -9,7 +9,7 @@ export type UseSavedSessionsResult = {
   loadingSessions: boolean
   sessionError: string | null
   loadSavedSessions: () => Promise<void>
-  captureCurrentWindowAsSession: (tabs: BrowserTab[], name?: string) => Promise<void>
+  captureCurrentWindowAsSession: (tabs: BrowserTab[], name?: string, note?: string) => Promise<void>
   deleteSession: (id: string) => Promise<void>
 }
 
@@ -31,8 +31,8 @@ export function useSavedSessions(): UseSavedSessionsResult {
   }, [])
 
   const captureCurrentWindowAsSession = useCallback(
-    async (tabs: BrowserTab[], name?: string) => {
-      await captureBrowserTabsAsSession(tabs, name ? { name } : undefined)
+    async (tabs: BrowserTab[], name?: string, note?: string) => {
+      await captureBrowserTabsAsSession(tabs, { name, note })
       await loadSavedSessions()
     },
     [loadSavedSessions]

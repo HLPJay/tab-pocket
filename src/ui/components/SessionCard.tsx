@@ -72,6 +72,7 @@ export function SessionCard({ session, tabsById, onOpenTab, onDeleteTab, onDelet
         </button>
         <div style={styles.info}>
           <div style={styles.name} title={session.name}>{session.name}</div>
+          {session.note && <div style={styles.note}>{session.note}</div>}
           <div style={styles.meta}>
             {session.tabIds.length} 个网页 · {capturedDate}
           </div>
@@ -162,6 +163,14 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  },
+  note: {
+    fontSize: 11,
+    color: '#6b7280',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
   },
   meta: {
     fontSize: 11,

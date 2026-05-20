@@ -27,7 +27,7 @@ const makeBrowserTab = (overrides: Partial<BrowserTab> = {}): BrowserTab => ({
   ...overrides,
 })
 
-const makeSavedTab = (): SavedTab => ({
+const makeSavedTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
   id: 'saved-1',
   url: 'https://example.com',
   normalizedUrl: 'https://example.com/',
@@ -38,6 +38,7 @@ const makeSavedTab = (): SavedTab => ({
   openCount: 0,
   status: 'inbox',
   tags: [],
+  ...overrides,
 })
 
 beforeEach(() => {
@@ -46,68 +47,86 @@ beforeEach(() => {
   vi.mocked(closeTab).mockResolvedValue(undefined)
 })
 
-describe('captureBrowserTabAndClose', () => {
+describe('captureBrowserTabAndClose — ordering', () => {
   it('calls captureBrowserTab before closeTab', async () => {
     const order: string[] = []
-    vi.mocked(captureBrowserTab).mockImplementation(async () => {
-      order.push('capture')
-      return makeSavedTab()
-    })
+    vi.mocked(captureBrowserTab).mockImplementation(async () => { order.push('capture'); return makeSavedTab() })
     vi.mocked(closeTab).mockImplementation(async () => { order.push('close') })
-
     await captureBrowserTabAndClose(makeBrowserTab())
     expect(order).toEqual(['capture', 'close'])
   })
 
   it('does NOT call closeTab when captureBrowserTab fails', async () => {
     vi.mocked(captureBrowserTab).mockRejectedValue(new Error('storage full'))
-
     await expect(captureBrowserTabAndClose(makeBrowserTab())).rejects.toThrow('storage full')
     expect(closeTab).not.toHaveBeenCalled()
+  })
+
+  it('when closeTab fails, captureBrowserTab was already called (data preserved)', async () => {
+    vi.mocked(closeTab).mockRejectedValue(new Error('Cannot close tab'))
+    await expect(captureBrowserTabAndClose(makeBrowserTab())).rejects.toThrow('Cannot close tab')
+    expect(captureBrowserTab).toHaveBeenCalledOnce()
   })
 
   it('returns the SavedTab on success', async () => {
     const saved = makeSavedTab()
     vi.mocked(captureBrowserTab).mockResolvedValue(saved)
-
     const result = await captureBrowserTabAndClose(makeBrowserTab())
     expect(result).toBe(saved)
   })
+})
 
-  it('when closeTab fails, captureBrowserTab was already called and data is preserved', async () => {
-    vi.mocked(closeTab).mockRejectedValue(new Error('Cannot close tab'))
-
-    await expect(captureBrowserTabAndClose(makeBrowserTab())).rejects.toThrow('Cannot close tab')
-    // captureBrowserTab was called (save happened)
-    expect(captureBrowserTab).toHaveBeenCalledOnce()
-    // closeTab was attempted
-    expect(closeTab).toHaveBeenCalledOnce()
-  })
-
-  it('throws a clear error for pinned tabs without calling captureBrowserTab', async () => {
-    await expect(
-      captureBrowserTabAndClose(makeBrowserTab({ pinned: true }))
-    ).rejects.toThrow('固定标签不可关闭')
+describe('captureBrowserTabAndClose — guards', () => {
+  it('throws for pinned tabs without calling captureBrowserTab', async () => {
+    await expect(captureBrowserTabAndClose(makeBrowserTab({ pinned: true }))).rejects.toThrow('固定标签不可关闭')
     expect(captureBrowserTab).not.toHaveBeenCalled()
     expect(closeTab).not.toHaveBeenCalled()
   })
 
-  it('throws a clear error for non-collectible URLs', async () => {
-    await expect(
-      captureBrowserTabAndClose(makeBrowserTab({ url: 'chrome://extensions' }))
-    ).rejects.toThrow('不可收纳')
+  it('throws for non-collectible URLs', async () => {
+    await expect(captureBrowserTabAndClose(makeBrowserTab({ url: 'chrome://extensions' }))).rejects.toThrow()
     expect(captureBrowserTab).not.toHaveBeenCalled()
-    expect(closeTab).not.toHaveBeenCalled()
   })
 
   it('calls closeTab with tab.id', async () => {
     await captureBrowserTabAndClose(makeBrowserTab({ id: 42 }))
     expect(closeTab).toHaveBeenCalledWith(42)
   })
+})
 
-  it('does not call chrome.tabs.remove directly — only through closeTab mock', () => {
-    // The mock intercepts closeTab only. If chrome.tabs.remove were called directly
-    // it would throw (no chrome global in test env). The test passing confirms abstraction.
-    expect(true).toBe(true)
+describe('captureBrowserTabAndClose — note passing', () => {
+  it('passes note to captureBrowserTab', async () => {
+    await captureBrowserTabAndClose(makeBrowserTab(), { note: '这个页面后面参考' })
+    expect(captureBrowserTab).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://example.com' }),
+      { note: '这个页面后面参考' }
+    )
+  })
+
+  it('passes undefined note when options is omitted', async () => {
+    await captureBrowserTabAndClose(makeBrowserTab())
+    expect(captureBrowserTab).toHaveBeenCalledWith(
+      expect.anything(),
+      { note: undefined }
+    )
+  })
+
+  it('when closeTab fails, captureBrowserTab was called with the correct note', async () => {
+    vi.mocked(closeTab).mockRejectedValue(new Error('close failed'))
+    await expect(
+      captureBrowserTabAndClose(makeBrowserTab(), { note: '关闭失败时备注仍已保存' })
+    ).rejects.toThrow('close failed')
+    expect(captureBrowserTab).toHaveBeenCalledWith(
+      expect.anything(),
+      { note: '关闭失败时备注仍已保存' }
+    )
+  })
+
+  it('save failure propagates error without calling closeTab', async () => {
+    vi.mocked(captureBrowserTab).mockRejectedValue(new Error('save error'))
+    await expect(
+      captureBrowserTabAndClose(makeBrowserTab(), { note: '备注' })
+    ).rejects.toThrow('save error')
+    expect(closeTab).not.toHaveBeenCalled()
   })
 })

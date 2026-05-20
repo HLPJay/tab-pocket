@@ -21,7 +21,7 @@ function defaultSessionName(): string {
 
 export async function captureBrowserTabsAsSession(
   tabs: BrowserTab[],
-  options?: { name?: string }
+  options?: { name?: string; note?: string }
 ): Promise<SavedSession> {
   const collectible = tabs.filter((t) => t.id !== undefined && !!t.url && isCollectibleUrl(t.url))
 
@@ -32,6 +32,7 @@ export async function captureBrowserTabsAsSession(
   const seenIds = new Set<string>()
   const tabIds: string[] = []
 
+  // Each tab is captured individually — session note is NOT written to each SavedTab
   for (const tab of collectible) {
     const saved = await captureBrowserTab(tab)
     if (!seenIds.has(saved.id)) {
@@ -40,6 +41,7 @@ export async function captureBrowserTabsAsSession(
     }
   }
 
+  const trimmedNote = options?.note?.trim() || undefined
   const now = Date.now()
   const session: SavedSession = {
     id: generateId(),
@@ -48,6 +50,7 @@ export async function captureBrowserTabsAsSession(
     capturedAt: now,
     updatedAt: now,
     status: 'active',
+    ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
   }
 
   await upsertSavedSession(session)

@@ -193,6 +193,18 @@ describe('upsertSavedSession', () => {
     const store = await getStore()
     expect(store.sessions['session-1'].name).toBe('New Name')
   })
+
+  it('preserves note field on session', async () => {
+    await upsertSavedSession(makeSession({ note: '这是备注' }))
+    const store = await getStore()
+    expect(store.sessions['session-1'].note).toBe('这是备注')
+  })
+
+  it('session without note field does not crash', async () => {
+    await upsertSavedSession(makeSession())
+    const store = await getStore()
+    expect(store.sessions['session-1'].note).toBeUndefined()
+  })
 })
 
 describe('softDeleteSavedSession', () => {

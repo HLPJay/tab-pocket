@@ -11,4 +11,6 @@ export type SavedSession = {
   deletedAt?: number
 
   status: SavedSessionStatus
+
+  note?: string
 }

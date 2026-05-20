@@ -12,8 +12,8 @@ export type UseSavedTabsResult = {
   loadingSaved: boolean
   savedError: string | null
   loadSavedTabs: () => Promise<void>
-  captureTab: (tab: BrowserTab) => Promise<void>
-  captureAndCloseTab: (tab: BrowserTab) => Promise<void>
+  captureTab: (tab: BrowserTab, note?: string) => Promise<void>
+  captureAndCloseTab: (tab: BrowserTab, note?: string) => Promise<void>
   openTab: (id: string) => Promise<void>
   deleteTab: (id: string) => Promise<void>
 }
@@ -36,17 +36,17 @@ export function useSavedTabs(): UseSavedTabsResult {
   }, [])
 
   const captureTab = useCallback(
-    async (tab: BrowserTab) => {
-      await captureBrowserTab(tab)
+    async (tab: BrowserTab, note?: string) => {
+      await captureBrowserTab(tab, { note })
       await loadSavedTabs()
     },
     [loadSavedTabs]
   )
 
   const captureAndCloseTab = useCallback(
-    async (tab: BrowserTab) => {
+    async (tab: BrowserTab, note?: string) => {
       try {
-        await captureBrowserTabAndClose(tab)
+        await captureBrowserTabAndClose(tab, { note })
       } finally {
         // Refresh inbox regardless of close success/failure so saved data is visible
         await loadSavedTabs()

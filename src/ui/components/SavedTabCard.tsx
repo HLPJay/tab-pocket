@@ -37,6 +37,7 @@ export function SavedTabCard({ tab, onOpen, onDelete }: Props) {
   return (
     <div style={styles.card}>
       <div style={styles.title} title={tab.title}>{tab.title}</div>
+      {tab.note && <div style={styles.note}>{tab.note}</div>}
       <div style={styles.meta}>
         <span style={styles.domain}>{tab.domain}</span>
         <span style={styles.dot}>·</span>
@@ -44,7 +45,7 @@ export function SavedTabCard({ tab, onOpen, onDelete }: Props) {
         {tab.openCount > 0 && (
           <>
             <span style={styles.dot}>·</span>
-            <span style={styles.openCount}>已打开 {tab.openCount} 次</span>
+            <span>已打开 {tab.openCount} 次</span>
           </>
         )}
       </div>
@@ -73,6 +74,14 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  note: {
+    fontSize: 11,
+    color: '#6b7280',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  },
   meta: {
     display: 'flex',
     alignItems: 'center',
@@ -83,7 +92,6 @@ const styles: Record<string, React.CSSProperties> = {
   domain: { color: '#6b7280' },
   dot: {},
   time: {},
-  openCount: {},
   error: {
     fontSize: 11,
     color: '#dc2626',
