@@ -228,7 +228,7 @@ export function App() {
   const handleSelectSection = useCallback((key: SectionNavKey) => {
     setSectionExpanded((prev) => ({
       ...prev,
-      [key]: true,
+      [key]: !prev[key],
     }))
 
     requestAnimationFrame(() => {
