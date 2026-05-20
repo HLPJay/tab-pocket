@@ -8,6 +8,13 @@ export async function closeTab(tabId: number): Promise<void> {
   await chrome.tabs.remove(tabId)
 }
 
+export async function activateTab(tabId: number, windowId?: number): Promise<void> {
+  await chrome.tabs.update(tabId, { active: true })
+  if (windowId !== undefined) {
+    await chrome.windows.update(windowId, { focused: true })
+  }
+}
+
 export async function getCurrentWindowTabs(): Promise<BrowserTab[]> {
   const tabs = await chrome.tabs.query({ currentWindow: true })
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
 import type { SessionTabInput } from '../../src/services/sessionCaptureService'
+import { activateBrowserTab } from '../../src/services/tabActivateService'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
 import type { SavedTab } from '../../src/domain/savedTabTypes'
@@ -66,6 +67,13 @@ export function App() {
     loadSavedTabs()
     loadSavedSessions()
   }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
+
+  const handleActivate = useCallback(
+    async (tab: BrowserTab) => {
+      await activateBrowserTab(tab)
+    },
+    []
+  )
 
   const handleCapture = useCallback(
     async (tab: BrowserTab, note: string) => {
@@ -139,6 +147,7 @@ export function App() {
           loading={loadingCurrent}
           error={currentError}
           capturedTabsByNormalizedUrl={capturedTabsByNormalizedUrl}
+          onActivate={handleActivate}
           onCapture={handleCapture}
           onCaptureAndClose={handleCaptureAndClose}
           onCancelCapture={deleteTab}

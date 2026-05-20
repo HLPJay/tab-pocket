@@ -9,6 +9,7 @@ type Props = {
   loading: boolean
   error: string | null
   capturedTabsByNormalizedUrl: Map<string, SavedTab>
+  onActivate: (tab: BrowserTab) => Promise<void>
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
   onCancelCapture: (id: string) => Promise<void>
@@ -23,6 +24,7 @@ export function CurrentTabsList({
   loading,
   error,
   capturedTabsByNormalizedUrl,
+  onActivate,
   onCapture,
   onCaptureAndClose,
   onCancelCapture,
@@ -50,6 +52,7 @@ export function CurrentTabsList({
             onCollapseNote={() =>
               setExpandedNoteKey((prev) => (prev === key ? null : prev))
             }
+            onActivate={onActivate}
             onCapture={onCapture}
             onCaptureAndClose={onCaptureAndClose}
             onCancelCapture={onCancelCapture}

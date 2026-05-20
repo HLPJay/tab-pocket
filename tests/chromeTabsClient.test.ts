@@ -5,10 +5,14 @@ vi.stubGlobal('chrome', {
     query: vi.fn(),
     create: vi.fn(),
     remove: vi.fn(),
+    update: vi.fn(),
+  },
+  windows: {
+    update: vi.fn(),
   },
 })
 
-import { createTab, closeTab } from '../src/chrome/chromeTabsClient'
+import { createTab, closeTab, activateTab } from '../src/chrome/chromeTabsClient'
 
 // Verify no batch-close export exists
 import * as chromeTabsClientModule from '../src/chrome/chromeTabsClient'
@@ -16,6 +20,8 @@ import * as chromeTabsClientModule from '../src/chrome/chromeTabsClient'
 beforeEach(() => {
   vi.mocked(chrome.tabs.create).mockReset()
   vi.mocked(chrome.tabs.remove).mockReset()
+  vi.mocked(chrome.tabs.update).mockReset()
+  vi.mocked(chrome.windows.update).mockReset()
 })
 
 describe('createTab', () => {
@@ -46,5 +52,36 @@ describe('closeTab', () => {
 
   it('does not export a batch closeTabs function', () => {
     expect((chromeTabsClientModule as Record<string, unknown>)['closeTabs']).toBeUndefined()
+  })
+})
+
+describe('activateTab', () => {
+  it('calls chrome.tabs.update with active: true', async () => {
+    vi.mocked(chrome.tabs.update).mockResolvedValue({} as chrome.tabs.Tab)
+    vi.mocked(chrome.windows.update).mockResolvedValue({} as chrome.windows.Window)
+
+    await activateTab(7)
+    expect(chrome.tabs.update).toHaveBeenCalledWith(7, { active: true })
+  })
+
+  it('calls chrome.windows.update when windowId is provided', async () => {
+    vi.mocked(chrome.tabs.update).mockResolvedValue({} as chrome.tabs.Tab)
+    vi.mocked(chrome.windows.update).mockResolvedValue({} as chrome.windows.Window)
+
+    await activateTab(7, 2)
+    expect(chrome.windows.update).toHaveBeenCalledWith(2, { focused: true })
+  })
+
+  it('does NOT call chrome.windows.update when windowId is omitted', async () => {
+    vi.mocked(chrome.tabs.update).mockResolvedValue({} as chrome.tabs.Tab)
+
+    await activateTab(7)
+    expect(chrome.windows.update).not.toHaveBeenCalled()
+  })
+
+  it('propagates errors from chrome.tabs.update', async () => {
+    vi.mocked(chrome.tabs.update).mockRejectedValue(new Error('No such tab'))
+
+    await expect(activateTab(99)).rejects.toThrow('No such tab')
   })
 })

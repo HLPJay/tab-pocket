@@ -9,6 +9,7 @@ type Props = {
   noteExpanded: boolean
   onToggleNote: () => void
   onCollapseNote: () => void
+  onActivate: (tab: BrowserTab) => Promise<void>
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
   onCancelCapture: (id: string) => Promise<void>
@@ -20,6 +21,7 @@ export function CurrentTabCard({
   noteExpanded,
   onToggleNote,
   onCollapseNote,
+  onActivate,
   onCapture,
   onCaptureAndClose,
   onCancelCapture,
@@ -27,6 +29,7 @@ export function CurrentTabCard({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  const [activateError, setActivateError] = useState<string | null>(null)
   const domain = getDomainFromUrl(tab.url)
   const isCaptured = capturedTab !== undefined
 
@@ -83,6 +86,15 @@ export function CurrentTabCard({
     }
   }
 
+  const handleActivate = async () => {
+    setActivateError(null)
+    try {
+      await onActivate(tab)
+    } catch (e) {
+      setActivateError(e instanceof Error ? e.message : '切换标签页失败')
+    }
+  }
+
   const closeDisabled = tab.pinned
 
   // Note button label
@@ -97,22 +109,41 @@ export function CurrentTabCard({
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        {tab.favIconUrl && (
-          <img
-            src={tab.favIconUrl}
-            alt=""
-            width={16}
-            height={16}
-            style={styles.favicon}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-        )}
-        <span style={styles.title} title={tab.title}>{tab.title}</span>
+        <div
+          style={styles.tabInfo}
+          onClick={handleActivate}
+          title="切换到这个标签页"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && handleActivate()}
+        >
+          {tab.favIconUrl && (
+            <img
+              src={tab.favIconUrl}
+              alt=""
+              width={16}
+              height={16}
+              style={styles.favicon}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          )}
+          <span style={styles.title}>{tab.title}</span>
+        </div>
         {tab.pinned && <span style={styles.badge}>固定</span>}
         {tab.active && <span style={{ ...styles.badge, ...styles.activeBadge }}>当前</span>}
         {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
-      <div style={styles.domain} title={tab.url}>{domain}</div>
+      <div
+        style={styles.domain}
+        onClick={handleActivate}
+        title="切换到这个标签页"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && handleActivate()}
+      >
+        {domain}
+      </div>
+      {activateError && <div style={styles.activateError}>{activateError}</div>}
 
       {noteExpanded && (
         <textarea
@@ -208,6 +239,14 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     minWidth: 0,
   },
+  tabInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+    cursor: 'pointer',
+  },
   favicon: {
     flexShrink: 0,
     borderRadius: 2,
@@ -243,6 +282,11 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    cursor: 'pointer',
+  },
+  activateError: {
+    fontSize: 11,
+    color: '#dc2626',
   },
   noteInput: {
     width: '100%',
