@@ -1,0 +1,64 @@
+import type { BrowserTab } from '../domain/browserTabTypes'
+import type { SavedTab } from '../domain/savedTabTypes'
+import { isCollectibleUrl, getDomainFromUrl } from './urlFilterService'
+import { normalizeUrl } from './urlNormalizeService'
+import { getStore, saveStore } from '../repositories/storageRepository'
+
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return Date.now().toString(36) + Math.random().toString(36).slice(2)
+}
+
+export async function captureBrowserTab(tab: BrowserTab): Promise<SavedTab> {
+  if (!isCollectibleUrl(tab.url)) {
+    throw new Error(`URL 不可收纳: ${tab.url}`)
+  }
+
+  const normalized = normalizeUrl(tab.url)
+  const store = await getStore()
+  const now = Date.now()
+
+  const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
+
+  if (existing) {
+    if (existing.status !== 'deleted') {
+      const updated: SavedTab = { ...existing, updatedAt: now }
+      store.tabs[existing.id] = updated
+      await saveStore(store)
+      return updated
+    }
+    const restored: SavedTab = {
+      ...existing,
+      status: 'inbox',
+      deletedAt: undefined,
+      updatedAt: now,
+    }
+    store.tabs[existing.id] = restored
+    await saveStore(store)
+    return restored
+  }
+
+  const saved: SavedTab = {
+    id: generateId(),
+    url: tab.url,
+    normalizedUrl: normalized,
+    title: tab.title,
+    domain: getDomainFromUrl(tab.url),
+    favIconUrl: tab.favIconUrl,
+    sourceWindowId: tab.windowId,
+    sourceTabId: tab.id,
+    sourceTabIndex: tab.index,
+    sourcePinned: tab.pinned,
+    capturedAt: now,
+    updatedAt: now,
+    openCount: 0,
+    status: 'inbox',
+    tags: [],
+  }
+
+  store.tabs[saved.id] = saved
+  await saveStore(store)
+  return saved
+}

@@ -1,12 +1,29 @@
+import { useState } from 'react'
 import type { BrowserTab } from '../../domain/browserTabTypes'
 import { getDomainFromUrl } from '../../services/urlFilterService'
 
 type Props = {
   tab: BrowserTab
+  isCaptured: boolean
+  onCapture: (tab: BrowserTab) => Promise<void>
 }
 
-export function CurrentTabCard({ tab }: Props) {
+export function CurrentTabCard({ tab, isCaptured, onCapture }: Props) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const domain = getDomainFromUrl(tab.url)
+
+  const handleCapture = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onCapture(tab)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '收纳失败')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div style={styles.card}>
@@ -24,11 +41,19 @@ export function CurrentTabCard({ tab }: Props) {
         <span style={styles.title} title={tab.title}>{tab.title}</span>
         {tab.pinned && <span style={styles.badge}>固定</span>}
         {tab.active && <span style={{ ...styles.badge, ...styles.activeBadge }}>当前</span>}
+        {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
       <div style={styles.domain} title={tab.url}>{domain}</div>
+      {error && <div style={styles.error}>{error}</div>}
       <div style={styles.actions}>
-        <button disabled style={styles.btn}>收纳</button>
-        <button disabled style={styles.btn}>收纳并关闭</button>
+        <button
+          onClick={handleCapture}
+          disabled={busy || isCaptured}
+          style={isCaptured ? styles.btnDisabled : styles.btn}
+        >
+          {busy ? '收纳中…' : '收纳'}
+        </button>
+        <button disabled style={styles.btnDisabled}>收纳并关闭</button>
       </div>
     </div>
   )
@@ -73,6 +98,10 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#dbeafe',
     color: '#1d4ed8',
   },
+  capturedBadge: {
+    background: '#d1fae5',
+    color: '#065f46',
+  },
   domain: {
     fontSize: 11,
     color: '#9ca3af',
@@ -80,12 +109,25 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  error: {
+    fontSize: 11,
+    color: '#dc2626',
+  },
   actions: {
     display: 'flex',
     gap: 6,
     marginTop: 4,
   },
   btn: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #6366f1',
+    background: '#eef2ff',
+    color: '#4338ca',
+    cursor: 'pointer',
+  },
+  btnDisabled: {
     fontSize: 11,
     padding: '3px 8px',
     borderRadius: 4,
