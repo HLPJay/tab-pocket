@@ -22,5 +22,6 @@ export type SavedTab = {
   status: SavedTabStatus
 
   note?: string
+  sessionId?: string
   tags: string[]
 }

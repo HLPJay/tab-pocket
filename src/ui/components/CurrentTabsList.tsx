@@ -7,8 +7,8 @@ type Props = {
   loading: boolean
   error: string | null
   capturedNormalizedUrls: Set<string>
-  onCapture: (tab: BrowserTab) => Promise<void>
-  onCaptureAndClose: (tab: BrowserTab) => Promise<void>
+  onCapture: (tab: BrowserTab, note: string) => Promise<void>
+  onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
 }
 
 export function CurrentTabsList({

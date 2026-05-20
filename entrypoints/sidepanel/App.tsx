@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BrowserTab } from '../../src/domain/browserTabTypes'
+import type { SessionTabInput } from '../../src/services/sessionCaptureService'
 import { getCurrentWindowTabs } from '../../src/chrome/chromeTabsClient'
 import { isCollectibleUrl } from '../../src/services/urlFilterService'
 import { normalizeUrl } from '../../src/services/urlNormalizeService'
 import { useSavedTabs } from '../../src/ui/hooks/useSavedTabs'
 import { useSavedSessions } from '../../src/ui/hooks/useSavedSessions'
 import { CurrentTabsList } from '../../src/ui/components/CurrentTabsList'
+import { WindowCapturePanel } from '../../src/ui/components/WindowCapturePanel'
 import { InboxList } from '../../src/ui/components/InboxList'
 import { TrashList } from '../../src/ui/components/TrashList'
 import { SessionList } from '../../src/ui/components/SessionList'
@@ -14,10 +16,7 @@ export function App() {
   const [currentTabs, setCurrentTabs] = useState<BrowserTab[]>([])
   const [loadingCurrent, setLoadingCurrent] = useState(true)
   const [currentError, setCurrentError] = useState<string | null>(null)
-
-  const [captureNote, setCaptureNote] = useState('')
-  const [capturingWindow, setCapturingWindow] = useState(false)
-  const [captureWindowError, setCaptureWindowError] = useState<string | null>(null)
+  const [showWindowCapture, setShowWindowCapture] = useState(false)
 
   const {
     savedTabs,
@@ -64,39 +63,32 @@ export function App() {
     loadSavedSessions()
   }, [loadCurrentTabs, loadSavedTabs, loadSavedSessions])
 
-  // Capture handlers close over captureNote and clear it on success
   const handleCapture = useCallback(
-    async (tab: BrowserTab) => {
-      await captureTab(tab, captureNote)
-      setCaptureNote('')
+    async (tab: BrowserTab, note: string) => {
+      await captureTab(tab, note)
     },
-    [captureTab, captureNote]
+    [captureTab]
   )
 
   const handleCaptureAndClose = useCallback(
-    async (tab: BrowserTab) => {
-      await captureAndCloseTab(tab, captureNote)
+    async (tab: BrowserTab, note: string) => {
+      await captureAndCloseTab(tab, note)
       await loadCurrentTabs()
-      setCaptureNote('')
     },
-    [captureAndCloseTab, captureNote, loadCurrentTabs]
+    [captureAndCloseTab, loadCurrentTabs]
   )
 
-  const handleCaptureCurrentWindow = useCallback(async () => {
-    setCapturingWindow(true)
-    setCaptureWindowError(null)
-    try {
-      await captureCurrentWindowAsSession(currentTabs, undefined, captureNote)
+  const handleWindowCaptureConfirm = useCallback(
+    async (inputs: SessionTabInput[], name: string) => {
+      await captureCurrentWindowAsSession(inputs, name)
       await loadSavedTabs()
-      setCaptureNote('')
-    } catch (e) {
-      setCaptureWindowError(e instanceof Error ? e.message : '批量收纳失败')
-    } finally {
-      setCapturingWindow(false)
-    }
-  }, [captureCurrentWindowAsSession, currentTabs, captureNote, loadSavedTabs])
+      setShowWindowCapture(false)
+    },
+    [captureCurrentWindowAsSession, loadSavedTabs]
+  )
 
-  const inboxTabs = savedTabs.filter((t) => t.status === 'inbox')
+  // Only show tabs with no sessionId in the ungrouped section
+  const ungroupedTabs = savedTabs.filter((t) => t.status === 'inbox' && !t.sessionId)
   const trashTabs = savedTabs.filter((t) => t.status === 'deleted')
   const activeSessions = savedSessions.filter((s) => s.status === 'active')
 
@@ -113,27 +105,24 @@ export function App() {
         <button onClick={refresh} style={styles.refreshBtn} title="刷新">↻</button>
       </header>
 
-      {/* 当前打开 — first section, contains note input and batch capture */}
+      {/* 当前打开 */}
       <Section label="当前打开">
-        <div style={styles.captureArea}>
-          <textarea
-            value={captureNote}
-            onChange={(e) => setCaptureNote(e.target.value)}
-            placeholder="写点备注，方便之后回顾，例如：Chrome sidePanel 官方文档，后面实现侧边栏时参考"
-            style={styles.noteInput}
-            rows={2}
-          />
-          <div style={styles.captureRow}>
-            <button
-              onClick={handleCaptureCurrentWindow}
-              disabled={capturingWindow || loadingCurrent}
-              style={capturingWindow ? styles.quickBtnBusy : styles.quickBtn}
-            >
-              {capturingWindow ? '收纳中…' : '收纳当前窗口'}
-            </button>
-          </div>
-          {captureWindowError && <div style={styles.captureError}>{captureWindowError}</div>}
+        <div style={styles.captureRow}>
+          <button
+            onClick={() => setShowWindowCapture(true)}
+            disabled={loadingCurrent || showWindowCapture}
+            style={loadingCurrent || showWindowCapture ? styles.quickBtnBusy : styles.quickBtn}
+          >
+            收纳当前窗口
+          </button>
         </div>
+        {showWindowCapture && (
+          <WindowCapturePanel
+            tabs={currentTabs}
+            onConfirm={handleWindowCaptureConfirm}
+            onCancel={() => setShowWindowCapture(false)}
+          />
+        )}
         <CurrentTabsList
           tabs={currentTabs}
           loading={loadingCurrent}
@@ -144,7 +133,7 @@ export function App() {
         />
       </Section>
 
-      {/* Sessions — second section */}
+      {/* Sessions */}
       <Section label="Sessions">
         <SessionList
           sessions={activeSessions}
@@ -157,10 +146,10 @@ export function App() {
         />
       </Section>
 
-      {/* Inbox — third section */}
-      <Section label="待回看 Inbox">
+      {/* 未分组收纳 */}
+      <Section label="未分组收纳">
         <InboxList
-          tabs={inboxTabs}
+          tabs={ungroupedTabs}
           loading={loadingSaved}
           error={savedError}
           onOpen={openTab}
@@ -168,7 +157,7 @@ export function App() {
         />
       </Section>
 
-      {/* 回收站 — last section */}
+      {/* 回收站 */}
       <Section label="回收站">
         <TrashList tabs={trashTabs} />
       </Section>
@@ -223,30 +212,8 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.05em',
     borderTop: '1px solid #f3f4f6',
   },
-  captureArea: {
-    padding: '8px 12px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    borderBottom: '1px solid #f3f4f6',
-  },
-  noteInput: {
-    width: '100%',
-    fontSize: 12,
-    padding: '6px 8px',
-    borderRadius: 6,
-    border: '1px solid #d1d5db',
-    resize: 'none',
-    fontFamily: 'inherit',
-    color: '#374151',
-    lineHeight: 1.5,
-    boxSizing: 'border-box',
-    outline: 'none',
-  },
   captureRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
+    padding: '6px 12px 4px',
   },
   quickBtn: {
     fontSize: 12,
@@ -267,9 +234,5 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#9ca3af',
     cursor: 'not-allowed',
     fontWeight: 500,
-  },
-  captureError: {
-    fontSize: 11,
-    color: '#dc2626',
   },
 }

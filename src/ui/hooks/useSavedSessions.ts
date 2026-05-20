@@ -1,15 +1,15 @@
 import { useState, useCallback } from 'react'
-import type { BrowserTab } from '../../domain/browserTabTypes'
 import type { SavedSession } from '../../domain/sessionTypes'
 import { listSavedSessions, softDeleteSavedSession } from '../../repositories/storageRepository'
 import { captureBrowserTabsAsSession } from '../../services/sessionCaptureService'
+import type { SessionTabInput } from '../../services/sessionCaptureService'
 
 export type UseSavedSessionsResult = {
   savedSessions: SavedSession[]
   loadingSessions: boolean
   sessionError: string | null
   loadSavedSessions: () => Promise<void>
-  captureCurrentWindowAsSession: (tabs: BrowserTab[], name?: string, note?: string) => Promise<void>
+  captureCurrentWindowAsSession: (inputs: SessionTabInput[], name?: string) => Promise<void>
   deleteSession: (id: string) => Promise<void>
 }
 
@@ -31,8 +31,8 @@ export function useSavedSessions(): UseSavedSessionsResult {
   }, [])
 
   const captureCurrentWindowAsSession = useCallback(
-    async (tabs: BrowserTab[], name?: string, note?: string) => {
-      await captureBrowserTabsAsSession(tabs, { name, note })
+    async (inputs: SessionTabInput[], name?: string) => {
+      await captureBrowserTabsAsSession(inputs, { name })
       await loadSavedSessions()
     },
     [loadSavedSessions]

@@ -5,20 +5,24 @@ import { getDomainFromUrl } from '../../services/urlFilterService'
 type Props = {
   tab: BrowserTab
   isCaptured: boolean
-  onCapture: (tab: BrowserTab) => Promise<void>
-  onCaptureAndClose: (tab: BrowserTab) => Promise<void>
+  onCapture: (tab: BrowserTab, note: string) => Promise<void>
+  onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
 }
 
 export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [showNote, setShowNote] = useState(false)
   const domain = getDomainFromUrl(tab.url)
 
   const handleCapture = async () => {
     setBusy(true)
     setError(null)
     try {
-      await onCapture(tab)
+      await onCapture(tab, note)
+      setNote('')
+      setShowNote(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : '收纳失败')
     } finally {
@@ -30,7 +34,9 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
     setBusy(true)
     setError(null)
     try {
-      await onCaptureAndClose(tab)
+      await onCaptureAndClose(tab, note)
+      setNote('')
+      setShowNote(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : '收纳并关闭失败')
     } finally {
@@ -59,12 +65,29 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
         {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
       <div style={styles.domain} title={tab.url}>{domain}</div>
+      {showNote && (
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="写点备注，方便之后回顾这个网页"
+          style={styles.noteInput}
+          rows={2}
+          autoFocus
+        />
+      )}
       {error && <div style={styles.error}>{error}</div>}
       <div style={styles.actions}>
         <button
+          onClick={() => setShowNote((v) => !v)}
+          disabled={busy}
+          style={busy ? styles.btnDisabled : styles.btnNote}
+        >
+          {showNote ? '收起备注' : '添加备注'}
+        </button>
+        <button
           onClick={handleCapture}
-          disabled={busy || isCaptured}
-          style={busy || isCaptured ? styles.btnDisabled : styles.btn}
+          disabled={busy}
+          style={busy ? styles.btnDisabled : styles.btn}
         >
           {busy ? '处理中…' : '收纳'}
         </button>
@@ -134,6 +157,19 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  noteInput: {
+    width: '100%',
+    fontSize: 12,
+    padding: '5px 7px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    resize: 'none',
+    fontFamily: 'inherit',
+    color: '#374151',
+    lineHeight: 1.4,
+    boxSizing: 'border-box',
+    outline: 'none',
+  },
   error: {
     fontSize: 11,
     color: '#dc2626',
@@ -146,7 +182,17 @@ const styles: Record<string, React.CSSProperties> = {
   actions: {
     display: 'flex',
     gap: 6,
-    marginTop: 4,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  btnNote: {
+    fontSize: 11,
+    padding: '3px 8px',
+    borderRadius: 4,
+    border: '1px solid #d1d5db',
+    background: '#f9fafb',
+    color: '#374151',
+    cursor: 'pointer',
   },
   btn: {
     fontSize: 11,

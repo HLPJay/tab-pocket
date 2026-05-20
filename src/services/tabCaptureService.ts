@@ -13,7 +13,7 @@ function generateId(): string {
 
 export async function captureBrowserTab(
   tab: BrowserTab,
-  options?: { note?: string }
+  options?: { note?: string; sessionId?: string }
 ): Promise<SavedTab> {
   if (!isCollectibleUrl(tab.url)) {
     throw new Error(`URL 不可收纳: ${tab.url}`)
@@ -23,6 +23,7 @@ export async function captureBrowserTab(
   const store = await getStore()
   const now = Date.now()
   const trimmedNote = options?.note?.trim() || undefined
+  const sessionId = options?.sessionId
 
   const existing = Object.values(store.tabs).find((t) => t.normalizedUrl === normalized)
 
@@ -32,6 +33,7 @@ export async function captureBrowserTab(
         ...existing,
         updatedAt: now,
         ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+        ...(sessionId !== undefined ? { sessionId } : {}),
       }
       store.tabs[existing.id] = updated
       await saveStore(store)
@@ -43,6 +45,7 @@ export async function captureBrowserTab(
       deletedAt: undefined,
       updatedAt: now,
       ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+      ...(sessionId !== undefined ? { sessionId } : {}),
     }
     store.tabs[existing.id] = restored
     await saveStore(store)
@@ -66,6 +69,7 @@ export async function captureBrowserTab(
     status: 'inbox',
     tags: [],
     ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
+    ...(sessionId !== undefined ? { sessionId } : {}),
   }
 
   store.tabs[saved.id] = saved

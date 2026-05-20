@@ -90,6 +90,38 @@ describe('captureBrowserTab — basic', () => {
   })
 })
 
+describe('captureBrowserTab — sessionId handling', () => {
+  it('writes sessionId when provided', async () => {
+    const saved = await captureBrowserTab(mockTab(), { sessionId: 'my-session' })
+    expect(saved.sessionId).toBe('my-session')
+  })
+
+  it('no sessionId option — sessionId is undefined', async () => {
+    const saved = await captureBrowserTab(mockTab())
+    expect(saved.sessionId).toBeUndefined()
+  })
+
+  it('updates sessionId on dedup (non-deleted)', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab() },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab(), { sessionId: 'new-session' })
+    expect(result.sessionId).toBe('new-session')
+  })
+
+  it('updates sessionId on deleted restore', async () => {
+    vi.mocked(getStore).mockResolvedValue({
+      version: 1,
+      tabs: { 'existing-id': existingTab({ status: 'deleted', deletedAt: 2000 }) },
+      sessions: {},
+    })
+    const result = await captureBrowserTab(mockTab(), { sessionId: 'restored-session' })
+    expect(result.sessionId).toBe('restored-session')
+  })
+})
+
 describe('captureBrowserTab — note handling', () => {
   it('saves trimmed note on new tab', async () => {
     const saved = await captureBrowserTab(mockTab(), { note: '  参考资料  ' })

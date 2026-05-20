@@ -4,6 +4,11 @@ import { isCollectibleUrl } from './urlFilterService'
 import { captureBrowserTab } from './tabCaptureService'
 import { upsertSavedSession } from '../repositories/storageRepository'
 
+export type SessionTabInput = {
+  tab: BrowserTab
+  note?: string
+}
+
 function generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -20,37 +25,37 @@ function defaultSessionName(): string {
 }
 
 export async function captureBrowserTabsAsSession(
-  tabs: BrowserTab[],
-  options?: { name?: string; note?: string }
+  inputs: SessionTabInput[],
+  options?: { name?: string }
 ): Promise<SavedSession> {
-  const collectible = tabs.filter((t) => t.id !== undefined && !!t.url && isCollectibleUrl(t.url))
+  const collectible = inputs.filter(
+    ({ tab }) => tab.id !== undefined && !!tab.url && isCollectibleUrl(tab.url)
+  )
 
   if (collectible.length === 0) {
-    throw new Error('当前窗口没有可收纳的网页')
+    throw new Error('没有可收纳的网页')
   }
 
+  const sessionId = generateId()
   const seenIds = new Set<string>()
   const tabIds: string[] = []
 
-  // Each tab is captured individually — session note is NOT written to each SavedTab
-  for (const tab of collectible) {
-    const saved = await captureBrowserTab(tab)
+  for (const { tab, note } of collectible) {
+    const saved = await captureBrowserTab(tab, { note, sessionId })
     if (!seenIds.has(saved.id)) {
       seenIds.add(saved.id)
       tabIds.push(saved.id)
     }
   }
 
-  const trimmedNote = options?.note?.trim() || undefined
   const now = Date.now()
   const session: SavedSession = {
-    id: generateId(),
+    id: sessionId,
     name: options?.name ?? defaultSessionName(),
     tabIds,
     capturedAt: now,
     updatedAt: now,
     status: 'active',
-    ...(trimmedNote !== undefined ? { note: trimmedNote } : {}),
   }
 
   await upsertSavedSession(session)

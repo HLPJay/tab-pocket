@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { BrowserTab } from '../src/domain/browserTabTypes'
 import type { SavedTab } from '../src/domain/savedTabTypes'
+import type { SessionTabInput } from '../src/services/sessionCaptureService'
 
 vi.mock('../src/services/tabCaptureService', () => ({
   captureBrowserTab: vi.fn(),
@@ -34,6 +35,11 @@ const makeTab = (overrides: Partial<BrowserTab> = {}): BrowserTab => ({
   ...overrides,
 })
 
+const makeInput = (overrides: Partial<BrowserTab> = {}, note?: string): SessionTabInput => ({
+  tab: makeTab(overrides),
+  note,
+})
+
 let savedIdCounter = 0
 const makeSavedTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
   id: `saved-${++savedIdCounter}`,
@@ -56,31 +62,31 @@ beforeEach(() => {
 })
 
 describe('captureBrowserTabsAsSession — filtering', () => {
-  it('calls captureBrowserTab for each http/https tab', async () => {
+  it('calls captureBrowserTab for each http/https input', async () => {
     vi.mocked(captureBrowserTab)
       .mockResolvedValueOnce(makeSavedTab({ id: 'a' }))
       .mockResolvedValueOnce(makeSavedTab({ id: 'b' }))
     await captureBrowserTabsAsSession([
-      makeTab({ id: 1, url: 'https://example.com' }),
-      makeTab({ id: 2, url: 'http://other.com' }),
+      makeInput({ url: 'https://example.com' }),
+      makeInput({ url: 'http://other.com' }),
     ])
     expect(captureBrowserTab).toHaveBeenCalledTimes(2)
   })
 
-  it('skips chrome://, edge://, about: and other non-collectible tabs', async () => {
+  it('skips chrome://, edge://, about: and other non-collectible inputs', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab({ id: 'a' }))
     await captureBrowserTabsAsSession([
-      makeTab({ url: 'chrome://extensions' }),
-      makeTab({ url: 'edge://settings' }),
-      makeTab({ url: 'about:blank' }),
-      makeTab({ url: 'https://example.com' }),
+      makeInput({ url: 'chrome://extensions' }),
+      makeInput({ url: 'edge://settings' }),
+      makeInput({ url: 'about:blank' }),
+      makeInput({ url: 'https://example.com' }),
     ])
     expect(captureBrowserTab).toHaveBeenCalledTimes(1)
   })
 
-  it('throws when no collectible tabs exist', async () => {
+  it('throws when no collectible inputs exist', async () => {
     await expect(
-      captureBrowserTabsAsSession([makeTab({ url: 'chrome://newtab' })])
+      captureBrowserTabsAsSession([makeInput({ url: 'chrome://newtab' })])
     ).rejects.toThrow('没有可收纳')
   })
 })
@@ -88,7 +94,7 @@ describe('captureBrowserTabsAsSession — filtering', () => {
 describe('captureBrowserTabsAsSession — session structure', () => {
   it('Session.tabIds uses SavedTab.id returned by captureBrowserTab', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab({ id: 'my-saved-id' }))
-    const session = await captureBrowserTabsAsSession([makeTab()])
+    const session = await captureBrowserTabsAsSession([makeInput()])
     expect(session.tabIds).toContain('my-saved-id')
   })
 
@@ -96,7 +102,8 @@ describe('captureBrowserTabsAsSession — session structure', () => {
     const shared = makeSavedTab({ id: 'deduped-id' })
     vi.mocked(captureBrowserTab).mockResolvedValue(shared)
     const session = await captureBrowserTabsAsSession([
-      makeTab({ id: 1 }), makeTab({ id: 2 }),
+      makeInput({ id: 1 }),
+      makeInput({ id: 2 }),
     ])
     expect(new Set(session.tabIds).size).toBe(session.tabIds.length)
     expect(session.tabIds.filter((id) => id === 'deduped-id')).toHaveLength(1)
@@ -104,59 +111,94 @@ describe('captureBrowserTabsAsSession — session structure', () => {
 
   it('uses options.name as session name', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()], { name: 'My Session' })
+    const session = await captureBrowserTabsAsSession([makeInput()], { name: 'My Session' })
     expect(session.name).toBe('My Session')
   })
 
   it('default name contains "当前窗口"', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()])
+    const session = await captureBrowserTabsAsSession([makeInput()])
     expect(session.name).toContain('当前窗口')
   })
 
   it('returned session has status active', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()])
+    const session = await captureBrowserTabsAsSession([makeInput()])
     expect(session.status).toBe('active')
+  })
+
+  it('session does not require a global note field', async () => {
+    vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
+    const session = await captureBrowserTabsAsSession([makeInput()])
+    expect(session.note).toBeUndefined()
   })
 
   it('does NOT call closeTab', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    await captureBrowserTabsAsSession([makeTab()])
+    await captureBrowserTabsAsSession([makeInput()])
     expect(closeTab).not.toHaveBeenCalled()
   })
 })
 
-describe('captureBrowserTabsAsSession — note handling', () => {
-  it('saves trimmed note on the session', async () => {
-    vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()], { note: '  参考资料  ' })
-    expect(session.note).toBe('参考资料')
+describe('captureBrowserTabsAsSession — per-tab note', () => {
+  it('passes each input note to captureBrowserTab', async () => {
+    vi.mocked(captureBrowserTab)
+      .mockResolvedValueOnce(makeSavedTab({ id: 'a' }))
+      .mockResolvedValueOnce(makeSavedTab({ id: 'b' }))
+    await captureBrowserTabsAsSession([
+      makeInput({ id: 1, url: 'https://a.com' }, '这是 A 的备注'),
+      makeInput({ id: 2, url: 'https://b.com' }, '这是 B 的备注'),
+    ])
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ url: 'https://a.com' }),
+      expect.objectContaining({ note: '这是 A 的备注' })
+    )
+    expect(captureBrowserTab).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ url: 'https://b.com' }),
+      expect.objectContaining({ note: '这是 B 的备注' })
+    )
   })
 
-  it('empty note results in no note field on session', async () => {
+  it('passes undefined note when input has no note', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()], { note: '' })
-    expect(session.note).toBeUndefined()
+    await captureBrowserTabsAsSession([makeInput()])
+    expect(captureBrowserTab).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ note: undefined })
+    )
   })
 
-  it('session note is NOT written to individual SavedTabs', async () => {
+  it('passes sessionId to captureBrowserTab so SavedTab gets sessionId written', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    await captureBrowserTabsAsSession([makeTab()], { note: '仅 session 级别备注' })
-    // captureBrowserTab is called without a note option
-    expect(captureBrowserTab).toHaveBeenCalledWith(expect.anything())
-    // Specifically: second argument should be undefined (not passed)
-    const call = vi.mocked(captureBrowserTab).mock.calls[0]
-    expect(call[1]).toBeUndefined()
+    await captureBrowserTabsAsSession([makeInput()])
+    expect(captureBrowserTab).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sessionId: expect.any(String) })
+    )
   })
 
-  it('options.name and options.note can both be set simultaneously', async () => {
+  it('all inputs in a single session receive the same sessionId', async () => {
+    vi.mocked(captureBrowserTab)
+      .mockResolvedValueOnce(makeSavedTab({ id: 'a' }))
+      .mockResolvedValueOnce(makeSavedTab({ id: 'b' }))
+    await captureBrowserTabsAsSession([
+      makeInput({ id: 1, url: 'https://a.com' }),
+      makeInput({ id: 2, url: 'https://b.com' }),
+    ])
+    const calls = vi.mocked(captureBrowserTab).mock.calls
+    const sessionIdA = (calls[0][1] as { sessionId: string }).sessionId
+    const sessionIdB = (calls[1][1] as { sessionId: string }).sessionId
+    expect(sessionIdA).toBe(sessionIdB)
+    expect(typeof sessionIdA).toBe('string')
+  })
+
+  it('session.id matches the sessionId passed to captureBrowserTab', async () => {
     vi.mocked(captureBrowserTab).mockResolvedValue(makeSavedTab())
-    const session = await captureBrowserTabsAsSession([makeTab()], {
-      name: 'P3 参考',
-      note: '这批页面是 P3 Session 实现参考资料',
-    })
-    expect(session.name).toBe('P3 参考')
-    expect(session.note).toBe('这批页面是 P3 Session 实现参考资料')
+    const session = await captureBrowserTabsAsSession([makeInput()])
+    const calls = vi.mocked(captureBrowserTab).mock.calls
+    const sessionId = (calls[0][1] as { sessionId: string }).sessionId
+    expect(session.id).toBe(sessionId)
   })
 })

@@ -12,7 +12,7 @@ type Props = {
 export function InboxList({ tabs, loading, error, onOpen, onDelete }: Props) {
   if (loading) return <div style={styles.state}>正在读取…</div>
   if (error) return <div style={{ ...styles.state, ...styles.error }}>{error}</div>
-  if (tabs.length === 0) return <div style={styles.state}>暂无待回看网页</div>
+  if (tabs.length === 0) return <div style={styles.state}>暂无未分组收纳的网页</div>
 
   return (
     <div>
