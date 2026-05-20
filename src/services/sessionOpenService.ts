@@ -1,5 +1,6 @@
 import { getStore, saveStore } from '../repositories/storageRepository'
 import { createTab } from '../chrome/chromeTabsClient'
+import { isTabCurrentMemberOfSession } from './sessionMembershipService'
 
 export async function openSessionTabs(sessionId: string): Promise<void> {
   const store = await getStore()
@@ -14,7 +15,7 @@ export async function openSessionTabs(sessionId: string): Promise<void> {
 
   for (const tabId of session.tabIds) {
     const tab = store.tabs[tabId]
-    if (!tab || tab.status === 'deleted') continue
+    if (!isTabCurrentMemberOfSession(tab, sessionId)) continue
 
     try {
       await createTab(tab.url)
@@ -30,12 +31,12 @@ export async function openSessionTabs(sessionId: string): Promise<void> {
     }
   }
 
-  if (opened > 0) {
-    store.sessions[sessionId] = {
-      ...session,
-      lastRestoredAt: now,
-      updatedAt: now,
-    }
-    await saveStore(store)
+  if (opened === 0) return
+
+  store.sessions[sessionId] = {
+    ...session,
+    lastRestoredAt: now,
+    updatedAt: now,
   }
+  await saveStore(store)
 }

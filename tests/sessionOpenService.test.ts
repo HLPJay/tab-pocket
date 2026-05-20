@@ -29,6 +29,7 @@ const makeTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
   updatedAt: 1000,
   openCount: 0,
   status: 'inbox',
+  sessionId: 'session-1',
   tags: [],
   ...overrides,
 })
@@ -109,6 +110,19 @@ describe('openSessionTabs', () => {
     expect(createTab).toHaveBeenCalledWith('https://b.com')
   })
 
+  it('skips tabs that belong to another session', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ sessionId: 'session-2' }),
+        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', sessionId: 'session-1' }),
+      },
+      sessions: { 'session-1': makeSession({ tabIds: ['tab-1', 'tab-2'] }) },
+    })
+    await openSessionTabs('session-1')
+    expect(createTab).toHaveBeenCalledOnce()
+    expect(createTab).toHaveBeenCalledWith('https://b.com')
+  })
+
   it('updates openCount and lastOpenedAt on each opened tab', async () => {
     setStore({
       tabs: { 'tab-1': makeTab({ openCount: 2 }) },
@@ -118,6 +132,38 @@ describe('openSessionTabs', () => {
     const saved = vi.mocked(saveStore).mock.calls[0][0]
     expect(saved.tabs['tab-1'].openCount).toBe(3)
     expect(saved.tabs['tab-1'].lastOpenedAt).toBeGreaterThan(0)
+  })
+
+  it('does not call saveStore when every tab has been transferred to another session', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ sessionId: 'session-2' }),
+        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', sessionId: 'session-3' }),
+      },
+      sessions: { 'session-1': makeSession({ tabIds: ['tab-1', 'tab-2'] }) },
+    })
+    await openSessionTabs('session-1')
+    expect(createTab).not.toHaveBeenCalled()
+    expect(saveStore).not.toHaveBeenCalled()
+  })
+
+  it('opens only the tabs that still belong to the current session in mixed lists', async () => {
+    setStore({
+      tabs: {
+        'tab-1': makeTab({ sessionId: 'session-2' }),
+        'tab-2': makeTab({ id: 'tab-2', url: 'https://b.com', sessionId: 'session-1' }),
+        'tab-3': makeTab({ id: 'tab-3', url: 'https://c.com', sessionId: 'session-4' }),
+      },
+      sessions: { 'session-1': makeSession({ tabIds: ['tab-1', 'tab-2', 'tab-3'] }) },
+    })
+    await openSessionTabs('session-1')
+    expect(createTab).toHaveBeenCalledTimes(1)
+    expect(createTab).toHaveBeenCalledWith('https://b.com')
+    expect(saveStore).toHaveBeenCalledTimes(1)
+    const saved = vi.mocked(saveStore).mock.calls[0][0]
+    expect(saved.tabs['tab-2'].openCount).toBe(1)
+    expect(saved.tabs['tab-1'].openCount).toBe(0)
+    expect(saved.tabs['tab-3'].openCount).toBe(0)
   })
 
   it('updates session.lastRestoredAt', async () => {

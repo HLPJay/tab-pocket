@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SavedSession } from '../../domain/sessionTypes'
 import type { SavedTab, SavedTabReviewStatus } from '../../domain/savedTabTypes'
+import { isTabCurrentMemberOfSession } from '../../services/sessionMembershipService'
 
 const REVIEW_LABEL: Record<SavedTabReviewStatus, string> = {
   unprocessed: '未处理',
@@ -37,7 +38,7 @@ export function SessionCard({
 
   const visibleTabs = session.tabIds
     .map((id) => ({ id, tab: tabsById[id] }))
-    .filter(({ tab }) => tab !== undefined && tab.status !== 'deleted') as {
+    .filter(({ tab }) => isTabCurrentMemberOfSession(tab, session.id)) as {
     id: string
     tab: SavedTab
   }[]
@@ -118,12 +119,15 @@ export function SessionCard({
           {expanded ? '▾' : '▸'}
         </button>
         <div style={styles.info}>
-          <div style={styles.name} title={session.name}>{session.name}</div>
+          <div style={styles.name} title={session.name}>
+            {session.name}
+          </div>
           {session.note && <div style={styles.note}>{session.note}</div>}
           <div style={styles.meta}>
             {visibleTabs.length} 个网页
             {reviewSummary ? ` · ${reviewSummary}` : ''}
-            {' · '}{capturedDate}
+            {' · '}
+            {capturedDate}
           </div>
         </div>
         <div style={styles.headerActions}>
@@ -151,7 +155,7 @@ export function SessionCard({
       {expanded && (
         <div style={styles.tabList}>
           {visibleTabs.length === 0 && (
-            <div style={styles.emptyTabs}>Session 内网页均已删除</div>
+            <div style={styles.emptyTabs}>Session 内网页均已移出或删除</div>
           )}
           {visibleTabs.map(({ id, tab }) => {
             const isBusy = busyTabId === id
@@ -159,7 +163,9 @@ export function SessionCard({
             return (
               <div key={id} style={styles.tabRow}>
                 <div style={styles.tabInfo}>
-                  <div style={styles.tabTitle} title={tab.title}>{tab.title}</div>
+                  <div style={styles.tabTitle} title={tab.title}>
+                    {tab.title}
+                  </div>
                   <div style={styles.tabMeta}>
                     {tab.tags[0] && <span style={styles.tag}>#{tab.tags[0]}</span>}
                     <span style={styles.reviewBadge}>{REVIEW_LABEL[rs]}</span>
