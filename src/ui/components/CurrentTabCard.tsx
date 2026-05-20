@@ -5,15 +5,25 @@ import { getDomainFromUrl } from '../../services/urlFilterService'
 type Props = {
   tab: BrowserTab
   isCaptured: boolean
+  noteExpanded: boolean
+  onToggleNote: () => void
+  onCollapseNote: () => void
   onCapture: (tab: BrowserTab, note: string) => Promise<void>
   onCaptureAndClose: (tab: BrowserTab, note: string) => Promise<void>
 }
 
-export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }: Props) {
+export function CurrentTabCard({
+  tab,
+  isCaptured,
+  noteExpanded,
+  onToggleNote,
+  onCollapseNote,
+  onCapture,
+  onCaptureAndClose,
+}: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [showNote, setShowNote] = useState(false)
   const domain = getDomainFromUrl(tab.url)
 
   const handleCapture = async () => {
@@ -22,7 +32,7 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
     try {
       await onCapture(tab, note)
       setNote('')
-      setShowNote(false)
+      onCollapseNote()
     } catch (e) {
       setError(e instanceof Error ? e.message : '收纳失败')
     } finally {
@@ -36,7 +46,7 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
     try {
       await onCaptureAndClose(tab, note)
       setNote('')
-      setShowNote(false)
+      onCollapseNote()
     } catch (e) {
       setError(e instanceof Error ? e.message : '收纳并关闭失败')
     } finally {
@@ -45,6 +55,7 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
   }
 
   const closeDisabled = tab.pinned
+  const noteButtonLabel = noteExpanded ? '收起备注' : note ? '编辑备注' : '添加备注'
 
   return (
     <div style={styles.card}>
@@ -65,7 +76,7 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
         {isCaptured && <span style={{ ...styles.badge, ...styles.capturedBadge }}>已收纳</span>}
       </div>
       <div style={styles.domain} title={tab.url}>{domain}</div>
-      {showNote && (
+      {noteExpanded && (
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -78,11 +89,11 @@ export function CurrentTabCard({ tab, isCaptured, onCapture, onCaptureAndClose }
       {error && <div style={styles.error}>{error}</div>}
       <div style={styles.actions}>
         <button
-          onClick={() => setShowNote((v) => !v)}
+          onClick={onToggleNote}
           disabled={busy}
           style={busy ? styles.btnDisabled : styles.btnNote}
         >
-          {showNote ? '收起备注' : '添加备注'}
+          {noteButtonLabel}
         </button>
         <button
           onClick={handleCapture}
