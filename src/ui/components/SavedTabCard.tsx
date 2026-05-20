@@ -108,12 +108,17 @@ export function SavedTabCard({ tab, onOpen, onDelete, onUpdateMeta }: Props) {
         ) : (
           <span style={styles.reviewBadge}>{REVIEW_LABEL[effectiveStatus]}</span>
         )}
+        {onUpdateMeta && (
+          <InlineNoteEditor
+            note={tab.note}
+            disabled={busy}
+            onSave={handleNoteSave}
+            compact
+            hideSummary
+          />
+        )}
       </div>
-      {onUpdateMeta ? (
-        <InlineNoteEditor note={tab.note} disabled={busy} onSave={handleNoteSave} />
-      ) : (
-        tab.note && <div style={styles.note}>{tab.note}</div>
-      )}
+      {tab.note && <div style={styles.note}>{tab.note}</div>}
       <div style={styles.meta}>
         <span style={styles.domain}>{tab.domain}</span>
         <span style={styles.dot}>·</span>

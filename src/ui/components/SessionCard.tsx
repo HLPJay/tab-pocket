@@ -131,25 +131,21 @@ export function SessionCard({
         </button>
         <div
           style={styles.info}
-          onDoubleClick={() => setExpanded((v) => !v)}
-          title="双击展开 / 收起"
+          onClick={() => setExpanded((v) => !v)}
+          title="点击展开 / 收起"
         >
           <div style={styles.name} title={session.name}>
             {session.name}
           </div>
           {session.note && <div style={styles.note}>{session.note}</div>}
           <div style={styles.meta}>
-            {visibleTabs.length} 个网页
-            {reviewSummary ? ` · ${reviewSummary}` : ''}
-            {' · '}
-            {capturedDate}
+            {visibleTabs.length} 个网页{reviewSummary ? ` · ${reviewSummary}` : ''} · {capturedDate}
           </div>
         </div>
         <div
           style={styles.headerActions}
-          onDoubleClick={(e) => {
-            e.stopPropagation()
-          }}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={handleOpenAll}
@@ -191,17 +187,18 @@ export function SessionCard({
                     <span style={styles.reviewBadge}>{REVIEW_LABEL[rs]}</span>
                     <span style={styles.tabDomain}>{tab.domain}</span>
                   </div>
-                  {onUpdateTabMeta ? (
+                  {tab.note && <div style={styles.tabNote}>{tab.note}</div>}
+                </div>
+                <div style={styles.tabActions}>
+                  {onUpdateTabMeta && (
                     <InlineNoteEditor
                       note={tab.note}
                       disabled={isBusy}
                       onSave={(note) => handleUpdateTabMeta(id, note)}
+                      compact
+                      hideSummary
                     />
-                  ) : (
-                    tab.note && <div style={styles.tabNote}>{tab.note}</div>
                   )}
-                </div>
-                <div style={styles.tabActions}>
                   <button
                     onClick={() => handleOpenTab(id)}
                     disabled={isBusy}
@@ -358,6 +355,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     display: 'flex',
     gap: 4,
+    alignItems: 'flex-start',
   },
   tabBtnPrimary: {
     fontSize: 10,
