@@ -78,3 +78,59 @@ export async function softDeleteSavedSession(id: string): Promise<void> {
   store.sessions[id] = { ...session, status: 'deleted', deletedAt: now, updatedAt: now }
   await saveStore(store)
 }
+
+// ── Trash operations ──────────────────────────────────────────────────────────
+
+export async function restoreSavedTab(id: string): Promise<void> {
+  const store = await getStore()
+  const tab = store.tabs[id]
+  if (!tab) return
+  if (tab.status !== 'deleted') return
+
+  const now = Date.now()
+
+  // Keep sessionId only if the referenced session is still active
+  let sessionId = tab.sessionId
+  if (sessionId) {
+    const session = store.sessions[sessionId]
+    if (!session || session.status !== 'active') {
+      sessionId = undefined
+    }
+  }
+
+  store.tabs[id] = {
+    ...tab,
+    status: 'inbox',
+    deletedAt: undefined,
+    updatedAt: now,
+    sessionId,
+  }
+  await saveStore(store)
+}
+
+export async function hardDeleteSavedTab(id: string): Promise<void> {
+  const store = await getStore()
+  const tab = store.tabs[id]
+  if (!tab) return
+  if (tab.status !== 'deleted') return
+  delete store.tabs[id]
+  await saveStore(store)
+}
+
+export async function clearTrash(): Promise<void> {
+  const store = await getStore()
+
+  for (const id of Object.keys(store.tabs)) {
+    if (store.tabs[id].status === 'deleted') {
+      delete store.tabs[id]
+    }
+  }
+
+  for (const id of Object.keys(store.sessions)) {
+    if (store.sessions[id].status === 'deleted') {
+      delete store.sessions[id]
+    }
+  }
+
+  await saveStore(store)
+}

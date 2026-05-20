@@ -26,6 +26,9 @@ import {
   listSavedSessions,
   upsertSavedSession,
   softDeleteSavedSession,
+  restoreSavedTab,
+  hardDeleteSavedTab,
+  clearTrash,
 } from '../src/repositories/storageRepository'
 
 const makeTab = (overrides: Partial<SavedTab> = {}): SavedTab => ({
@@ -232,5 +235,134 @@ describe('softDeleteSavedSession', () => {
 
   it('does nothing when session id does not exist', async () => {
     await expect(softDeleteSavedSession('nonexistent')).resolves.toBeUndefined()
+  })
+})
+
+// ── restoreSavedTab ───────────────────────────────────────────────────────────
+
+describe('restoreSavedTab', () => {
+  it('restores a deleted tab to inbox', async () => {
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 5000 }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].status).toBe('inbox')
+  })
+
+  it('clears deletedAt on restore', async () => {
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 5000 }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].deletedAt).toBeUndefined()
+  })
+
+  it('updates updatedAt on restore', async () => {
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 1000, updatedAt: 1000 }))
+    const before = Date.now()
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].updatedAt).toBeGreaterThanOrEqual(before)
+  })
+
+  it('preserves sessionId when referenced session is active', async () => {
+    await upsertSavedSession(makeSession({ id: 'session-1', status: 'active' }))
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 1000, sessionId: 'session-1' }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].sessionId).toBe('session-1')
+  })
+
+  it('clears sessionId when referenced session is deleted', async () => {
+    await upsertSavedSession(makeSession({ id: 'session-1', status: 'deleted', deletedAt: 1000 }))
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 1000, sessionId: 'session-1' }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].sessionId).toBeUndefined()
+  })
+
+  it('clears sessionId when referenced session does not exist', async () => {
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 1000, sessionId: 'ghost-session' }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].sessionId).toBeUndefined()
+  })
+
+  it('does nothing when tab does not exist', async () => {
+    await expect(restoreSavedTab('nonexistent')).resolves.toBeUndefined()
+  })
+
+  it('does nothing when tab is not deleted', async () => {
+    await upsertSavedTab(makeTab({ status: 'inbox' }))
+    await restoreSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1'].status).toBe('inbox')
+  })
+})
+
+// ── hardDeleteSavedTab ────────────────────────────────────────────────────────
+
+describe('hardDeleteSavedTab', () => {
+  it('removes a deleted tab from the store', async () => {
+    await upsertSavedTab(makeTab({ status: 'deleted', deletedAt: 1000 }))
+    await hardDeleteSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1']).toBeUndefined()
+  })
+
+  it('does not remove an inbox tab', async () => {
+    await upsertSavedTab(makeTab({ status: 'inbox' }))
+    await hardDeleteSavedTab('tab-1')
+    const store = await getStore()
+    expect(store.tabs['tab-1']).toBeDefined()
+    expect(store.tabs['tab-1'].status).toBe('inbox')
+  })
+
+  it('does nothing when tab does not exist', async () => {
+    await expect(hardDeleteSavedTab('nonexistent')).resolves.toBeUndefined()
+  })
+})
+
+// ── clearTrash ────────────────────────────────────────────────────────────────
+
+describe('clearTrash', () => {
+  it('removes all deleted tabs', async () => {
+    await upsertSavedTab(makeTab({ id: 'a', status: 'deleted', deletedAt: 1000 }))
+    await upsertSavedTab(makeTab({ id: 'b', status: 'deleted', deletedAt: 2000 }))
+    await clearTrash()
+    const store = await getStore()
+    expect(store.tabs['a']).toBeUndefined()
+    expect(store.tabs['b']).toBeUndefined()
+  })
+
+  it('removes all deleted sessions', async () => {
+    await upsertSavedSession(makeSession({ id: 'dead-session', status: 'deleted', deletedAt: 1000 }))
+    await clearTrash()
+    const store = await getStore()
+    expect(store.sessions['dead-session']).toBeUndefined()
+  })
+
+  it('preserves inbox tabs', async () => {
+    await upsertSavedTab(makeTab({ id: 'keep', status: 'inbox' }))
+    await upsertSavedTab(makeTab({ id: 'gone', status: 'deleted', deletedAt: 1000 }))
+    await clearTrash()
+    const store = await getStore()
+    expect(store.tabs['keep']).toBeDefined()
+    expect(store.tabs['gone']).toBeUndefined()
+  })
+
+  it('preserves active sessions', async () => {
+    await upsertSavedSession(makeSession({ id: 'live', status: 'active' }))
+    await upsertSavedSession(makeSession({ id: 'dead', status: 'deleted', deletedAt: 1000 }))
+    await clearTrash()
+    const store = await getStore()
+    expect(store.sessions['live']).toBeDefined()
+    expect(store.sessions['dead']).toBeUndefined()
+  })
+
+  it('writes store exactly once', async () => {
+    await upsertSavedTab(makeTab({ id: 'a', status: 'deleted', deletedAt: 1000 }))
+    await upsertSavedTab(makeTab({ id: 'b', status: 'deleted', deletedAt: 2000 }))
+    vi.mocked(chrome.storage.local.set).mockClear()
+    await clearTrash()
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1)
   })
 })

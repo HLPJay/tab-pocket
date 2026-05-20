@@ -27,6 +27,9 @@ export function App() {
     captureAndCloseTab,
     openTab,
     deleteTab,
+    restoreTab,
+    hardDeleteTab,
+    clearTrash,
   } = useSavedTabs()
 
   const {
@@ -77,6 +80,11 @@ export function App() {
     },
     [captureAndCloseTab, loadCurrentTabs]
   )
+
+  const handleClearTrash = useCallback(async () => {
+    await clearTrash()
+    await loadSavedSessions()
+  }, [clearTrash, loadSavedSessions])
 
   const handleWindowCaptureConfirm = useCallback(
     async (inputs: SessionTabInput[], name: string) => {
@@ -157,10 +165,13 @@ export function App() {
         />
       </Section>
 
-      {/* 回收站 */}
-      <Section label="回收站">
-        <TrashList tabs={trashTabs} />
-      </Section>
+      {/* 回收站 — self-contained with collapse/expand header */}
+      <TrashList
+        tabs={trashTabs}
+        onRestore={restoreTab}
+        onHardDelete={hardDeleteTab}
+        onClearTrash={handleClearTrash}
+      />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { captureBrowserTab } from '../../services/tabCaptureService'
 import { captureBrowserTabAndClose } from '../../services/tabCaptureAndCloseService'
 import { openSavedTab } from '../../services/tabOpenService'
 import { deleteSavedTab } from '../../services/tabDeleteService'
+import { restoreTab as restoreTabSvc, hardDeleteTab as hardDeleteTabSvc, clearTrash as clearTrashSvc } from '../../services/trashService'
 
 export type UseSavedTabsResult = {
   savedTabs: SavedTab[]
@@ -16,6 +17,9 @@ export type UseSavedTabsResult = {
   captureAndCloseTab: (tab: BrowserTab, note?: string) => Promise<void>
   openTab: (id: string) => Promise<void>
   deleteTab: (id: string) => Promise<void>
+  restoreTab: (id: string) => Promise<void>
+  hardDeleteTab: (id: string) => Promise<void>
+  clearTrash: () => Promise<void>
 }
 
 export function useSavedTabs(): UseSavedTabsResult {
@@ -71,6 +75,30 @@ export function useSavedTabs(): UseSavedTabsResult {
     [loadSavedTabs]
   )
 
+  const restoreTab = useCallback(
+    async (id: string) => {
+      await restoreTabSvc(id)
+      await loadSavedTabs()
+    },
+    [loadSavedTabs]
+  )
+
+  const hardDeleteTab = useCallback(
+    async (id: string) => {
+      await hardDeleteTabSvc(id)
+      await loadSavedTabs()
+    },
+    [loadSavedTabs]
+  )
+
+  const clearTrash = useCallback(
+    async () => {
+      await clearTrashSvc()
+      await loadSavedTabs()
+    },
+    [loadSavedTabs]
+  )
+
   return {
     savedTabs,
     loadingSaved,
@@ -80,5 +108,8 @@ export function useSavedTabs(): UseSavedTabsResult {
     captureAndCloseTab,
     openTab,
     deleteTab,
+    restoreTab,
+    hardDeleteTab,
+    clearTrash,
   }
 }
